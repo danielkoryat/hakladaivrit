@@ -10,9 +10,9 @@
     "directory": "./public",
     "binding": "ASSETS",
     "run_worker_first": [
-      "/api/*", "/", "/ads.txt", "/robots.txt", "/sitemap.xml",
-      "/test", "/lessons", "/lesson/*", "/practice", "/profile", "/admin", "/privacy", "/custom/*",
-      "/test/", "/lessons/", "/practice/", "/profile/", "/admin/", "/privacy/"
+      "/api/*", "/", "/ads.txt", "/robots.txt", "/sitemap.xml", "/llms.txt",
+      "/test", "/lessons", "/lesson/*", "/practice", "/guide", "/profile", "/admin", "/privacy", "/custom/*",
+      "/test/", "/lessons/", "/practice/", "/guide/", "/profile/", "/admin/", "/privacy/"
     ],
     "not_found_handling": "404-page"
   },

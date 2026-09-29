@@ -710,6 +710,27 @@ details p { margin: .6rem 0 0 !important; color: var(--c-sub-alt); }
 .auth-or { display: flex; align-items: center; gap: .7rem; color: var(--c-sub-alt); font-size: .8rem; }
 .auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--c-grid); }
 
+/* ---------- Guide & page texts ---------- */
+.guide h1 { font-size: 2.1rem; line-height: 1.3; margin: .5rem 0 .6rem; }
+.lead-text { font-size: 1.1rem; color: var(--c-sub-alt); }
+.toc { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.5rem 0 1rem; }
+.toc a { background: var(--c-sub); color: var(--c-text); padding: .3rem .8rem; border-radius: 999px; font-size: .9rem; text-decoration: none; }
+.toc a:hover { color: var(--c-primary); }
+.guide h2 { scroll-margin-top: 1rem; }
+.content ol { padding-inline-start: 1.4rem; }
+.content ol li { margin-bottom: .5rem; }
+.table-wrap { overflow-x: auto; margin: 0 0 1rem; }
+.content table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+.content th { text-align: right; color: var(--c-sub-alt); font-weight: 500; padding: .5rem .6rem; border-bottom: 1px solid var(--c-grid); }
+.content td { padding: .55rem .6rem; border-bottom: 1px solid var(--c-grid); }
+.content td:first-child { font-weight: 600; white-space: nowrap; }
+.page-info { max-width: 820px; margin: 3.5rem auto 0; padding-top: 1.5rem; border-top: 1px solid var(--c-grid); }
+.page-info h1 { font-size: 1.5rem; margin: 0 0 .6rem; }
+.page-info h2 { font-size: 1.15rem; margin: 1.6rem 0 .5rem; }
+.page-info p, .page-info li { color: var(--c-sub-alt); }
+.page-info strong { color: var(--c-text); }
+.home-cta .btn + .btn { margin-inline-start: .5rem; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 760px) {
   .header { gap: .75rem; padding: 1rem 0; flex-wrap: wrap; }

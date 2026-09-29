@@ -45,3 +45,17 @@ jobs:
 
       - name: Deploy
         run: npx wrangler deploy
+
+      # Tell Bing (and through it ChatGPT search, Copilot, DuckDuckGo) and Yandex which pages changed.
+      - name: Notify search engines (IndexNow)
+        continue-on-error: true
+        env:
+          INDEXNOW_KEY: 5d282cb84ed7fd9c20e5d623a15b306b
+        run: |
+          sleep 20
+          curl -fsS https://hakladaivrit.com/sitemap.xml | grep -o '<loc>[^<]*</loc>' | sed -e 's/<loc>//' -e 's#</loc>##' > urls.txt
+          jq -n --arg key "$INDEXNOW_KEY" --rawfile urls urls.txt \
+            '{host: "hakladaivrit.com", key: $key, keyLocation: ("https://hakladaivrit.com/" + $key + ".txt"), urlList: ($urls | split("\n") | map(select(length > 0)))}' > indexnow.json
+          echo "Submitting $(jq '.urlList | length' indexnow.json) URLs"
+          curl -sS -X POST https://api.indexnow.org/indexnow -H 'Content-Type: application/json; charset=utf-8' \
+            --data @indexnow.json -o /dev/null -w 'IndexNow response: %{http_code}\n'

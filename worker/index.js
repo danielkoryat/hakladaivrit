@@ -348,12 +348,14 @@ async function api(request, env, route, cfg) {
 const SITE = 'הקלדה עיוורת';
 const HOME_DESC = 'למדו להקליד בעברית מהר ומדויק בעשר אצבעות: מבחן מהירות, 16 שיעורים מדורגים ותרגול חכם, בחינם.';
 const PAGES = {
-  '/': { title: 'הקלדה עיוורת בעברית | מבחן הקלדה, שיעורים ותרגול', desc: HOME_DESC, priority: '1.0' },
-  '/test': { title: 'מבחן הקלדה בעברית: בדקו את מהירות ההקלדה שלכם | הקלדה עיוורת', priority: '0.9', crumb: 'מבחן הקלדה',
+  '/': { title: 'הקלדה עיוורת בעברית | מבחן הקלדה, שיעורים ותרגול', desc: HOME_DESC, priority: '1.0', content: 'home' },
+  '/guide': { title: 'מדריך הקלדה עיוורת בעברית: אצבעות, שורת הבית ותוכנית לימוד | הקלדה עיוורת', priority: '0.9', crumb: 'מדריך',
+    content: 'guide', desc: 'מדריך מלא ללימוד הקלדה עיוורת בעברית: איזו אצבע לוחצת על כל מקש, שורת הבית, אותיות סופיות, תנוחה נכונה, תוכנית לימוד ושאלות נפוצות.' },
+  '/test': { title: 'מבחן הקלדה בעברית: בדקו את מהירות ההקלדה שלכם | הקלדה עיוורת', priority: '0.9', crumb: 'מבחן הקלדה', info: 'test',
     desc: 'מבחן מהירות הקלדה חינמי בעברית לפי זמן, מספר מילים או ציטוט. קבלו מילים לדקה, תווים לדקה, דיוק ורשימה של המקשים שכדאי לשפר.' },
-  '/lessons': { title: 'שיעורי הקלדה עיוורת בעברית: 16 שיעורים מדורגים | הקלדה עיוורת', priority: '0.9', crumb: 'שיעורים',
+  '/lessons': { title: 'שיעורי הקלדה עיוורת בעברית: 16 שיעורים מדורגים | הקלדה עיוורת', priority: '0.9', crumb: 'שיעורים', info: 'lessons',
     desc: 'למדו הקלדה עיוורת בעברית צעד אחר צעד: שורת הבית, השורה העליונה והתחתונה, פיסוק ומספרים, עם ידיים וירטואליות שמראות איזו אצבע ללחוץ.' },
-  '/practice': { title: 'תרגול הקלדה בעברית שמתמקד במקשים החלשים שלכם | הקלדה עיוורת', priority: '0.8', crumb: 'תרגול',
+  '/practice': { title: 'תרגול הקלדה בעברית שמתמקד במקשים החלשים שלכם | הקלדה עיוורת', priority: '0.8', crumb: 'תרגול', info: 'practice',
     desc: 'תרגול הקלדה חכם בעברית: האתר מזהה את המקשים והמילים שבהם אתם טועים ובונה תרגילים שמחזקים בדיוק אותם.' },
   '/privacy': { title: 'מדיניות פרטיות | הקלדה עיוורת', priority: '0.3', crumb: 'מדיניות פרטיות',
     desc: 'איזה מידע האתר הקלדה עיוורת אוסף, איך הוא משמש ואיך אפשר למחוק אותו.' },
@@ -402,33 +404,101 @@ const siteOrigin = url => (/^(localhost|127\.|\[::1\])/.test(url.hostname) ? url
 
 const attr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function structuredData(meta, origin) {
+function structuredData(meta, origin, body) {
   const home = `${origin}/`;
-  if (meta.path === '/') {
-    return {
-      '@context': 'https://schema.org',
-      '@graph': [
-        { '@type': 'WebSite', '@id': `${home}#website`, url: home, name: SITE, alternateName: 'הקלדה עיוורת בעברית', inLanguage: 'he' },
-        {
-          '@type': 'WebApplication', name: 'הקלדה עיוורת בעברית', url: home, inLanguage: 'he',
-          applicationCategory: 'EducationalApplication', operatingSystem: 'Any', isAccessibleForFree: true,
-          description: HOME_DESC, image: `${origin}/og-image.png`,
-          offers: { '@type': 'Offer', price: '0', priceCurrency: 'ILS' },
-        },
-      ],
-    };
-  }
+  const org = { '@type': 'Organization', '@id': `${home}#organization`, name: SITE, url: home, logo: `${origin}/icon-512.png` };
+  const faq = body.faq && body.faq.length ? {
+    '@type': 'FAQPage', '@id': `${origin}${meta.path === '/' ? '/' : meta.path}#faq`,
+    mainEntity: body.faq.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+  } : null;
   const trail = [{ name: SITE, item: home }];
   if (meta.lesson) trail.push({ name: 'שיעורים', item: `${origin}/lessons` });
-  trail.push({ name: meta.crumb, item: `${origin}${meta.path}` });
-  return {
-    '@context': 'https://schema.org',
+  if (meta.crumb) trail.push({ name: meta.crumb, item: `${origin}${meta.path}` });
+  const crumbs = {
     '@type': 'BreadcrumbList',
     itemListElement: trail.map((t, i) => ({ '@type': 'ListItem', position: i + 1, name: t.name, item: t.item })),
   };
+  const graph = [];
+  if (meta.path === '/') {
+    graph.push(
+      { '@type': 'WebSite', '@id': `${home}#website`, url: home, name: SITE, alternateName: 'הקלדה עיוורת בעברית', inLanguage: 'he', publisher: { '@id': org['@id'] } },
+      org,
+      {
+        '@type': 'WebApplication', name: 'הקלדה עיוורת בעברית', url: home, inLanguage: 'he',
+        applicationCategory: 'EducationalApplication', operatingSystem: 'Any', browserRequirements: 'דפדפן מודרני ומקלדת פיזית',
+        isAccessibleForFree: true, description: HOME_DESC, image: `${origin}/og-image.png`,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'ILS' },
+        featureList: ['מבחן מהירות הקלדה בעברית', '16 שיעורי הקלדה עיוורת מדורגים', 'ידיים וירטואליות שמראות איזו אצבע ללחוץ', 'תרגול חכם של מקשים חלשים', 'ניתוח דיוק ומהירות לכל מקש ואצבע'],
+      },
+    );
+  } else {
+    graph.push(crumbs);
+  }
+  if (meta.path === '/guide') {
+    graph.push({
+      '@type': 'Article', headline: 'מדריך הקלדה עיוורת בעברית', description: meta.desc, inLanguage: 'he',
+      url: `${origin}/guide`, mainEntityOfPage: `${origin}/guide`, image: `${origin}/og-image.png`,
+      author: { '@id': org['@id'] }, publisher: org, datePublished: '2026-09-29', dateModified: '2026-09-29',
+    });
+  }
+  if (meta.path === '/lessons' && body.lessons) {
+    graph.push({
+      '@type': 'Course', name: 'קורס הקלדה עיוורת בעברית', description: meta.desc, url: `${origin}/lessons`, inLanguage: 'he',
+      isAccessibleForFree: true, provider: org, educationalLevel: 'מתחילים',
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'ILS', category: 'Free' },
+      hasCourseInstance: { '@type': 'CourseInstance', courseMode: 'online', courseWorkload: 'PT4H' },
+      syllabusSections: body.lessons.map(l => ({ '@type': 'Syllabus', name: `שיעור ${l.id}: ${l.title}`, description: l.desc, url: `${origin}/lesson/${l.id}` })),
+    });
+  }
+  if (faq) graph.push(faq);
+  return { '@context': 'https://schema.org', '@graph': graph };
 }
 
-function withMeta(html, meta, origin) {
+// ---------- Page text in the HTML (for crawlers that don't run JavaScript) ----------
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const stripTags = h => h.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+
+async function fragment(env, url, name) {
+  const r = await env.ASSETS.fetch(new Request(`${url.origin}/content/${name}.html`));
+  return r.ok ? r.text() : '';
+}
+function faqFrom(html) {
+  const out = [];
+  const re = /<details><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g;
+  let m;
+  while ((m = re.exec(html))) out.push({ q: stripTags(m[1]), a: stripTags(m[2]) });
+  return out;
+}
+
+async function pageBody(env, url, meta) {
+  if (meta.content) {
+    const html = await fragment(env, url, meta.content);
+    return { html, ssr: meta.content, faq: faqFrom(html) };
+  }
+  if (meta.path === '/lessons') {
+    const all = await lessons(env, url.origin);
+    const list = `<section class="page"><h1>שיעורי הקלדה עיוורת בעברית</h1>
+<p>16 שיעורים מדורגים: מתחילים בשורת הבית ומתקדמים שורה אחרי שורה. כל שיעור מוסיף כמה מקשים חדשים.</p>
+<ol>${all.map(l => `<li><a href="/lesson/${l.id}">שיעור ${l.id}: ${esc(l.title)}</a>. ${esc(l.desc)}</li>`).join('')}</ol></section>`;
+    return { html: list + await fragment(env, url, 'lessons'), lessons: all };
+  }
+  if (meta.info) {
+    const html = await fragment(env, url, meta.info);
+    return { html, ssr: meta.info };
+  }
+  if (meta.lesson) {
+    const l = meta.lesson;
+    const nav = [l.id > 1 ? `<a href="/lesson/${l.id - 1}">לשיעור הקודם</a>` : '', l.id < meta.total ? `<a href="/lesson/${l.id + 1}">לשיעור הבא</a>` : '']
+      .filter(Boolean).join(' · ');
+    return {
+      html: `<section class="page"><div class="lesson-head"><a class="back" href="/lessons">כל השיעורים</a>
+<div class="lesson-meta">שיעור ${l.id} מתוך ${meta.total}</div><h1>${esc(l.title)}</h1><p>${esc(l.desc)}</p></div><p>${nav}</p></section>`,
+    };
+  }
+  return { html: '' };
+}
+
+function withMeta(html, meta, origin, body) {
   const url = `${origin}${meta.path === '/' ? '/' : meta.path}`;
   html = html
     .replace(/<title>[^<]*<\/title>/, `<title>${attr(meta.title)}</title>`)
@@ -439,9 +509,13 @@ function withMeta(html, meta, origin) {
   let head = `  <link rel="canonical" href="${attr(url)}">\n`;
   if (meta.noindex) head += '  <meta name="robots" content="noindex">\n';
   else if (meta.crumb || meta.path === '/') {
-    head += `  <script type="application/ld+json">${JSON.stringify(structuredData(meta, origin)).replace(/</g, '\\u003c')}</script>\n`;
+    head += `  <script type="application/ld+json">${JSON.stringify(structuredData(meta, origin, body)).replace(/</g, '\\u003c')}</script>\n`;
   }
-  return html.replace('</head>', `${head}</head>`);
+  html = html.replace('</head>', `${head}</head>`);
+  if (body.html) {
+    html = html.replace('<main id="view"></main>', `<main id="view"${body.ssr ? ` data-ssr="${body.ssr}"` : ''}>${body.html}</main>`);
+  }
+  return html;
 }
 
 async function sitemap(env, origin) {
@@ -451,15 +525,35 @@ async function sitemap(env, origin) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 
-const robots = origin => `User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /profile
-Disallow: /admin
-Disallow: /custom/
+// Search engines and AI assistants (ChatGPT, Gemini, Claude, Perplexity, Copilot…) are all welcome.
+const CRAWLERS = ['Googlebot', 'Google-Extended', 'Bingbot', 'OAI-SearchBot', 'ChatGPT-User', 'GPTBot', 'ClaudeBot', 'Claude-SearchBot',
+  'Claude-User', 'PerplexityBot', 'Perplexity-User', 'Applebot', 'Applebot-Extended', 'DuckDuckBot', 'CCBot'];
+const RULES = 'Allow: /\nDisallow: /api/\nDisallow: /profile\nDisallow: /admin\nDisallow: /custom/\n';
+const robots = origin => `${CRAWLERS.map(c => `User-agent: ${c}`).join('\n')}\n${RULES}\nUser-agent: *\n${RULES}\nSitemap: ${origin}/sitemap.xml\n`;
 
-Sitemap: ${origin}/sitemap.xml
+// A plain-language summary for AI assistants (https://llmstxt.org).
+async function llmsTxt(env, url, origin) {
+  const all = await lessons(env, url.origin);
+  return `# הקלדה עיוורת בעברית (hakladaivrit.com)
+
+> אתר חינמי ללימוד הקלדה עיוורת בעברית, בעשר אצבעות ובלי להסתכל על המקלדת. יש בו מבחן מהירות הקלדה, קורס של ${all.length} שיעורים מדורגים עם מקלדת וידיים וירטואליות שמראות איזו אצבע ללחוץ, ותרגול חכם שמתמקד במקשים שבהם כל משתמש טועה. אין צורך בהרשמה. התחברות עם Google שומרת את ההתקדמות ובונה שיעורים אישיים.
+
+עובדות:
+- חינם לגמרי, בעברית, עובד בכל דפדפן במחשב עם מקלדת פיזית.
+- פריסת המקלדת העברית התקנית. עובד גם כשהמחשב מוגדר לאנגלית, כי האתר מזהה את המיקום הפיזי של המקש.
+- מודד מילים לדקה (WPM), תווים לדקה (CPM) ודיוק, ומנתח דיוק ומהירות לכל מקש, אצבע ושורה.
+
+## עמודים עיקריים
+- [דף הבית](${origin}/): מה זו הקלדה עיוורת ולמה כדאי ללמוד אותה.
+- [מדריך הקלדה עיוורת בעברית](${origin}/guide): איזו אצבע לוחצת על כל מקש, שורת הבית, אותיות סופיות, תנוחה נכונה, תוכנית לימוד ושאלות נפוצות.
+- [מבחן הקלדה בעברית](${origin}/test): מבחן מהירות לפי זמן, מספר מילים או ציטוט.
+- [שיעורי הקלדה](${origin}/lessons): קורס של ${all.length} שיעורים מדורגים.
+- [תרגול חכם](${origin}/practice): תרגול שמתמקד במקשים החלשים של המשתמש.
+
+## השיעורים
+${all.map(l => `- [שיעור ${l.id}: ${l.title}](${origin}/lesson/${l.id}): ${l.desc}`).join('\n')}
 `;
+}
 
 // ---------- HTML page ----------
 // With ads on, Google's ad scripts load other scripts and frames from many domains, so scripts
@@ -488,7 +582,7 @@ async function servePage(request, env, cfg, meta) {
   const url = new URL(request.url);
   const asset = await env.ASSETS.fetch(new Request(url.origin + '/', { headers: request.headers }));
   if (!asset.ok) return asset;
-  let html = withMeta(await asset.text(), meta, siteOrigin(url));
+  let html = withMeta(await asset.text(), meta, siteOrigin(url), await pageBody(env, url, meta));
   let nonce = null;
   if (cfg.adsClient) {
     nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
@@ -518,6 +612,9 @@ export default {
         return new Response(`google.com, ${cfg.adsClient.replace(/^ca-/, '')}, DIRECT, f08c47fec0942fa0\n`, { headers: { 'Content-Type': 'text/plain' } });
       }
       if (url.pathname === '/robots.txt') return new Response(robots(siteOrigin(url)), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      if (url.pathname === '/llms.txt') {
+        return new Response(await llmsTxt(env, url, siteOrigin(url)), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
+      }
       if (url.pathname === '/sitemap.xml') {
         return new Response(await sitemap(env, siteOrigin(url)), { headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
       }

@@ -2,6 +2,23 @@
 
 (() => {
   const view = $('#view');
+
+  // Page texts live in public/content/*.html. The server already puts the current page's text
+  // into the HTML (for search engines and AI crawlers); reuse it instead of fetching it again.
+  const contentCache = new Map();
+  if (view.dataset.ssr) contentCache.set(view.dataset.ssr, Promise.resolve(view.innerHTML));
+  function content(name) {
+    if (!contentCache.has(name)) {
+      contentCache.set(name, fetch(`/content/${name}.html`).then(r => (r.ok ? r.text() : '')).catch(() => ''));
+    }
+    return contentCache.get(name);
+  }
+  let routeToken = 0;
+  // Fills the #page-info box at the bottom of a page with its explanation text.
+  function fillInfo(name) {
+    const token = routeToken;
+    content(name).then(html => { const el = $('#page-info'); if (token === routeToken && el) el.innerHTML = html; });
+  }
   const isTouch = matchMedia('(hover: none) and (pointer: coarse)').matches;
 
   const Prefs = {
@@ -264,10 +281,13 @@
     route();
   }
 
+  let renderedPath = null;
   function route() {
     if (cleanup) cleanup();
     cleanup = null;
     keyHandler = null;
+    routeToken++;
+    renderedPath = location.pathname;
     const [, page = '', arg] = location.pathname.replace(/\/+$/, '').split('/');
     const navKey = page === 'lesson' || page === 'custom' ? 'lessons' : page;
     $$('.nav a').forEach(a => a.classList.toggle('active', a.dataset.nav === navKey));
@@ -279,12 +299,14 @@
     else if (page === 'profile') viewProfile();
     else if (page === 'admin') viewAdmin();
     else if (page === 'privacy') viewPrivacy();
+    else if (page === 'guide') viewGuide();
     else viewHome();
-    window.scrollTo(0, 0);
+    if (!location.hash) window.scrollTo(0, 0);
     Ads.fill();
     Analytics.page(location.pathname);
   }
-  window.addEventListener('popstate', route);
+  // Jumping to a section of the same page (#faq) shouldn't re-render it.
+  window.addEventListener('popstate', () => { if (location.pathname !== renderedPath) route(); });
   // Internal links switch pages without reloading.
   document.addEventListener('click', e => {
     const a = e.target.closest('a[href^="/"]');
@@ -296,7 +318,7 @@
   function upgradeHashLink() {
     if (location.hash.startsWith('#/')) history.replaceState(null, '', location.hash.slice(1) || '/');
   }
-  window.addEventListener('hashchange', () => { upgradeHashLink(); route(); });
+  window.addEventListener('hashchange', () => { if (location.hash.startsWith('#/')) { upgradeHashLink(); route(); } });
 
   // Keep Space / Enter from activating a focused button while typing.
   view.addEventListener('click', e => { const b = e.target.closest('button'); if (b) b.blur(); });
@@ -353,68 +375,13 @@
   }
 
   // ---------- Home ----------
-  function viewHome() {
+  async function viewHome() {
     document.title = 'הקלדה עיוורת בעברית | מבחן הקלדה, שיעורים ותרגול';
-    view.innerHTML = `
-      <section class="hero">
-        <h1>הקלדה <span>עיוורת</span> בעברית</h1>
-        <p class="lead">מבחן הקלדה חינמי, שיעורים מדורגים ותרגול חכם. ללמוד להקליד מהר ומדויק בעשר אצבעות, בלי להסתכל על המקלדת.</p>
-        <div class="hero-actions">
-          <a class="btn primary" href="/test">התחלת מבחן הקלדה</a>
-          <a class="btn" href="/practice">התחלת תרגול</a>
-          <a class="btn ghost" href="/lessons">שיעורי הקלדה</a>
-        </div>
-        <div class="hero-kb" id="home-kb"></div>
-        ${fingerLegend()}
-      </section>
-      ${Ads.slot('home')}
-
-      <article class="content">
-        <h2>הקלדה עיוורת: להקליד מהר בלי להסתכל על המקלדת</h2>
-        <p><strong>הקלדה עיוורת</strong>, שנקראת גם <strong>הקלדה בעשר אצבעות</strong>, היא שיטה שבה מקלידים בלי להסתכל על המקלדת. כל אצבע אחראית על קבוצת מקשים קבועה, ועם הזמן נבנה <strong>זיכרון שריר</strong> שמוצא כל אות לבד.</p>
-        <p>בין אם אתם סטודנטים, מתכנתים, כותבים או עובדי משרד, שליטה בהקלדה עיוורת <strong>משפרת משמעותית את המהירות ואת הדיוק</strong>.</p>
-
-        <h2>למה ללמוד הקלדה עיוורת?</h2>
-        <ul>
-          <li>להקליד מהר ומדויק יותר</li>
-          <li>להתרכז במחשבות ולא במקלדת</li>
-          <li>לעבוד ביעילות ובפחות עייפות</li>
-        </ul>
-        <p>בלי לחפש מקשים ובלי להעביר את המבט בין המסך למקלדת. רק הקלדה חלקה, מהירה ומדויקת.</p>
-
-        <h2>יתרונות מרכזיים</h2>
-        <div class="cards3">
-          <div class="card"><div class="card-icon">${ICON.zap}</div><h3>מהירות</h3><p>עם תרגול קבוע אפשר להגיע ל־200 עד 400 תווים לדקה ויותר, ולסיים משימות מהר יותר.</p></div>
-          <div class="card"><div class="card-icon">${ICON.check}</div><h3>דיוק</h3><p>כשהאצבעות יודעות את הדרך, יש פחות טעויות ופחות זמן על תיקונים.</p></div>
-          <div class="card"><div class="card-icon">${ICON.heart}</div><h3>ארגונומיה</h3><p>יציבה נכונה ומבט קבוע במסך מפחיתים עומס על הצוואר, הגב והעיניים.</p></div>
-        </div>
-
-        <h2>שורת הבית: ש ד ג כ · ח ל ך ף</h2>
-        <p>האצבעות נחות תמיד על שורת הבית. ביד שמאל: זרת על <b>ש</b>, קמיצה על <b>ד</b>, אמה על <b>ג</b> ואצבע מורה על <b>כ</b>. ביד ימין: אצבע מורה על <b>ח</b>, אמה על <b>ל</b>, קמיצה על <b>ך</b> וזרת על <b>ף</b>. על המקשים כ ו־ח (F ו־J) יש בליטה קטנה, וכך מוצאים את המקום בלי להסתכל. האגודלים אחראים על מקש הרווח.</p>
-
-        <h2>ידיים וירטואליות בזמן אמת</h2>
-        <p>בזמן ההקלדה מופיעה מתחת לטקסט מקלדת עם <strong>ידיים וירטואליות</strong>: האצבע שצריכה ללחוץ על המקש הבא נדלקת ונשלחת אליו, כך שתמיד ברור איזו אצבע עובדת, בלי להסתכל על הידיים האמיתיות.</p>
-
-        <h2>מבחן הקלדה אונליין</h2>
-        <ul>
-          <li><strong>זמן</strong>: מקלידים כמה שיותר במשך 15, 30, 60 או 120 שניות.</li>
-          <li><strong>מילים</strong>: מקלידים מספר קבוע של מילים: 10, 25, 50 או 100.</li>
-          <li><strong>ציטוט</strong>: מקלידים משפט מפורסם, כולל סימני פיסוק.</li>
-        </ul>
-        <p>בסיום מקבלים מילים לדקה (WPM), תווים לדקה (CPM), אחוז דיוק ורשימה של המקשים שבהם טעיתם.</p>
-
-        <h2>שיעורים מותאמים אישית</h2>
-        <p>האתר מנתח כל הקשה: <strong>דיוק ומהירות לכל מקש, לכל אצבע ולכל שורה</strong>, ואת המילים שבהן אתם טועים. מתוך הנתונים נבנים שיעורים אישיים שמחזקים בדיוק את החולשות שלכם. עם חשבון, כל התוצאות וההתקדמות נשמרות ומסונכרנות בין מכשירים.</p>
-
-        ${Ads.slot('home')}
-        <h2>שאלות נפוצות</h2>
-        <details><summary>כמה זמן לוקח ללמוד הקלדה עיוורת?</summary><p>רוב האנשים מכירים את כל המקשים אחרי שבוע או שבועיים של 15 עד 20 דקות תרגול ביום. המהירות ממשיכה לעלות עם הזמן.</p></details>
-        <details><summary>צריך להחליף את שפת המקלדת לעברית?</summary><p>לא חובה. האתר מזהה את המיקום הפיזי של המקש, כך שגם כשהמחשב מוגדר לאנגלית, לחיצה על A תיחשב כ־ש.</p></details>
-        <details><summary>מה נחשב מהירות טובה?</summary><p>הקלדה ממוצעת היא בערך 35 עד 40 מילים לדקה. 60 ומעלה נחשב מהיר, ו־80 ומעלה מצוין. בהתחלה חשוב יותר להקפיד על דיוק, והמהירות תגיע.</p></details>
-        <details><summary>צריך חשבון?</summary><p>לא. אפשר לתרגל כאורח, והנתונים יישמרו בדפדפן. עם חשבון, התוצאות נשמרות בשרת ואפשר להמשיך מכל מחשב.</p></details>
-
-        <div class="home-cta"><a class="btn primary" href="/lessons">מתחילים מהשיעור הראשון</a></div>
-      </article>`;
+    const token = routeToken;
+    const html = await content('home');
+    if (token !== routeToken) return;
+    view.innerHTML = html;
+    Ads.fill(view);
 
     // A little demo: the hands "type" a phrase on the home keyboard.
     const kb = Keyboard($('#home-kb'), { colored: true, hands: true });
@@ -441,7 +408,9 @@
         </div>
         <div class="result" id="result" hidden></div>
         ${touchNote()}
+        <div id="page-info"></div>
       </section>`;
+    fillInfo('test');
 
     let typer = null, kb = null, lastText = '', lastQuote = null;
 
@@ -604,8 +573,10 @@
               </a>`;
             }).join('')}
           </div>`).join('')}
+        <div id="page-info"></div>
       </section>`;
     Keyboard($('#lkb'), { colored: true, hands: Prefs.hands });
+    fillInfo('lessons');
   }
 
   function customCard(l) {
@@ -780,7 +751,9 @@
         </div>
         <div class="kb-wrap" id="heat" style="margin-top:0"></div>
         <div class="legend"><span>מדויק</span><span class="heat-scale"></span><span>הרבה טעויות</span></div>
+        <div id="page-info"></div>
       </section>`;
+    fillInfo('practice');
 
     let typer = null, kb = null, round = 1;
     const heatKb = Keyboard($('#heat'));
@@ -1242,6 +1215,17 @@
 
     renderRange();
     load();
+  }
+
+  // ---------- Guide ----------
+  async function viewGuide() {
+    document.title = 'מדריך הקלדה עיוורת בעברית: אצבעות, שורת הבית ותוכנית לימוד | הקלדה עיוורת';
+    const token = routeToken;
+    const html = await content('guide');
+    if (token !== routeToken) return;
+    view.innerHTML = html;
+    Ads.fill(view);
+    if (location.hash.length > 1) { const el = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (el) el.scrollIntoView(); }
   }
 
   // ---------- Privacy policy ----------

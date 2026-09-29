@@ -59,16 +59,25 @@ In Google Cloud Console → **Google Auth Platform**:
 The worker verifies every Google token's signature, audience, expiry and verified email itself
 (`lib/google-auth.js`, tested by `npm test`).
 
-## Search engines
+## Search engines and AI assistants
 
 Every page has its own address (`/test`, `/lessons`, `/lesson/1` … `/lesson/16`, `/practice`,
-`/privacy`); old `/#/…` links still work. The worker adds each page's title, description,
-canonical link and structured data (schema.org) to the HTML, and serves `/sitemap.xml` and
-`/robots.txt`. Private pages (`/profile`, `/admin`, `/custom/…`) are marked `noindex`.
-Lesson titles and descriptions are read from `public/js/data.js`.
+`/guide`, `/privacy`); old `/#/…` links still work.
 
-In Google Search Console, add the **Domain** property `hakladaivrit.com` (verify with the TXT
-record it gives you, in Cloudflare → DNS), then submit `https://hakladaivrit.com/sitemap.xml`.
+- **Page text is in the HTML.** Page texts live in `public/content/*.html`; the worker puts the
+  current page's text into the HTML (so crawlers that don't run JavaScript, like ChatGPT's, see it)
+  and the site shows the same file to visitors. Lesson pages and the lesson list are generated from
+  `public/js/data.js`.
+- **Tags and structured data:** title, description, canonical link, Open Graph, and schema.org
+  (WebSite, Organization, WebApplication, FAQPage, Course, Article, BreadcrumbList).
+- **`/sitemap.xml`, `/robots.txt`** (search and AI crawlers explicitly allowed; private pages
+  blocked and `noindex`) and **`/llms.txt`**, a plain-language summary for AI assistants.
+- **IndexNow:** every deploy notifies Bing (used by ChatGPT search and Copilot) and Yandex of all
+  pages; the key file is `public/5d282cb84ed7fd9c20e5d623a15b306b.txt`.
+
+Google Search Console: add the **Domain** property `hakladaivrit.com` (verify with the TXT record it
+gives you, in Cloudflare → DNS), then submit `https://hakladaivrit.com/sitemap.xml`.
+Bing Webmaster Tools: sign in at https://www.bing.com/webmasters and import the site from Search Console.
 
 ## Visitor statistics (Google Analytics)
 
@@ -109,3 +118,4 @@ It shows registered users, sign-ups, active users per day, completed activities 
   - `js/text.js` – exercise text generation
   - `js/account.js` – sign-in, profile data, Google Analytics, ads, analysis, personalised lessons
   - `js/app.js` – typing engine, pages and routing
+  - `content/*.html` – page texts (home, guide, and explanations for the test, lessons and practice pages)
