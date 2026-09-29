@@ -42,7 +42,7 @@ const BADGES = [
 
 const Gamify = {
   RANKS, BADGES,
-  goal() { return Prefs.kids ? 60 : 100; },
+  goal() { return 100; },
   levelOf(xp) { return Math.floor(Math.sqrt(xp / 40)) + 1; },
   xpForLevel(level) { return 40 * (level - 1) ** 2; },
   rank(level) { let r = RANKS[0]; for (const x of RANKS) if (level >= x[0]) r = x; return { emoji: r[1], name: r[2] }; },
@@ -167,8 +167,7 @@ const Celebrate = {
   // Everything to show after an activity.
   show(reward) {
     if (!reward) return;
-    const kids = Prefs.kids;
-    this.notice(`<b class="num">+${reward.xp}</b> XP${kids ? ' 🎉' : ''}`, 'xp');
+    this.notice(`<b class="num">+${reward.xp}</b> XP`, 'xp');
     reward.newBadges.forEach(([, emoji, title, how]) => this.notice(`<span class="n-emoji">${emoji}</span><span><b>תג חדש: ${esc(title)}</b><br>${esc(how)}</span>`, 'badge'));
     if (reward.goalMet) this.notice('<span class="n-emoji">✅</span><span><b>עמדתם ביעד היומי!</b><br>נתראה מחר כדי לשמור על הרצף 🔥</span>', 'badge');
     if (reward.levelUp) {

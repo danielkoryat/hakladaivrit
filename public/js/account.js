@@ -334,12 +334,12 @@ function customLessons(a) {
   }
   if (a.weakestFinger) {
     const f = a.weakestFinger;
-    out.push({ id: 'finger', title: `חיזוק ${f.name}`, keys: FINGER_CHARS[f.f].filter(c => isHebrew(c) || c === '.' || c === ','), target: base,
+    out.push({ id: 'finger', title: `חיזוק ${f.name}`, keys: FINGER_CHARS[f.f].filter(c => isLangLetter(c) || c === '.' || c === ','), target: base,
       desc: `ה${f.name} היא האצבע עם הדיוק הנמוך ביותר (${Math.round(f.acc * 100)}%). השיעור מתרגל רק את המקשים שלה.` });
   }
   if (a.weakestRow) {
     const r = a.weakestRow;
-    const keys = Object.keys(ROW_OF).filter(c => ROW_OF[c] === r.r && (isHebrew(c) || /\d/.test(c)));
+    const keys = Object.keys(ROW_OF).filter(c => ROW_OF[c] === r.r && (isLangLetter(c) || /\d/.test(c)));
     out.push({ id: 'row', title: `חיזוק ${r.name}`, keys, target: base,
       desc: `${r.name} היא השורה עם הדיוק הנמוך ביותר אצלך (${Math.round(r.acc * 100)}%).` });
   }

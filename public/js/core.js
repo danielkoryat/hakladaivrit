@@ -29,11 +29,7 @@ const isTouch = matchMedia('(hover: none) and (pointer: coarse)').matches;
 const Prefs = {
   get hands() { return Store.get('hands', true); },
   set hands(v) { Store.set('hands', !!v); },
-  // Kids mode: bigger letters, simpler words, more encouragement.
-  get kids() { return Store.get('kids', false); },
-  set kids(v) { Store.set('kids', !!v); document.body.classList.toggle('kids', !!v); },
 };
-document.body.classList.toggle('kids', Prefs.kids);
 
 const ICON = {
   restart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
@@ -97,7 +93,12 @@ class Typer {
     this.caret.className = 'caret';
     this.wordsEl.append(this.caret);
     this.el.append(this.wordsEl);
-    Object.assign(this, { chars: [], spans: [], ltr: [], ranges: [], lastWord: null });
+    Object.assign(this, { chars: [], spans: [], ltr: [], ranges: [], lastWord: null, lastInRun: false, lastRtl: null, run: null });
+    // The box runs right to left for Hebrew text and left to right for English.
+    const letters = text.match(/[א-תA-Za-z]/g) || [];
+    const heb = letters.filter(isHebrew).length;
+    this.rtl = letters.length ? heb * 2 >= letters.length : LANG !== 'en';
+    this.el.dir = this.rtl ? 'rtl' : 'ltr';
     this.addWords(text.trim().split(/\s+/));
     requestAnimationFrame(() => this.updateCaret());
   }
@@ -112,25 +113,35 @@ class Typer {
     this.ltr.push(ltr);
   }
 
+  // Words in the other direction (English or numbers in Hebrew text, Hebrew in English text)
+  // are grouped into one run, so a phrase keeps its own reading order and still wraps.
   addWords(words) {
-    if (this.lastWord) this.letter(' ', this.lastWord, false);
     const frag = document.createDocumentFragment();
-    words.forEach((w, i) => {
+    words.forEach(w => {
+      const rtl = /[א-ת]/.test(w) && !/\d/.test(w) ? true : /[A-Za-z\d]/.test(w) ? false : this.lastRtl ?? this.rtl;
+      const inRun = rtl !== this.rtl;
       const wordEl = document.createElement('div');
       wordEl.className = 'word';
-      let box = wordEl;
-      const ltr = /\d/.test(w);
-      if (ltr) {
-        box = document.createElement('span');
-        box.className = 'ltr-run';
-        wordEl.append(box);
+      // The space between two words takes the direction they share, otherwise the box's own,
+      // so it sits between a run and the word after it.
+      if (this.lastWord) {
+        if (this.lastInRun && !inRun) this.letter(' ', wordEl, !this.rtl);
+        else this.letter(' ', this.lastWord, this.lastInRun ? !rtl : !this.rtl);
+      }
+      if (inRun) {
+        if (!this.lastInRun) {
+          this.run = document.createElement('div');
+          this.run.className = rtl ? 'rtl-run' : 'ltr-run';
+          frag.append(this.run);
+        }
+        this.run.append(wordEl);
+      } else {
+        frag.append(wordEl);
       }
       const start = this.chars.length;
-      for (const c of w) this.letter(c, box, ltr);
+      for (const c of w) this.letter(c, wordEl, !rtl);
       this.ranges.push([start, this.chars.length]);
-      if (i < words.length - 1) this.letter(' ', wordEl, false);
-      frag.append(wordEl);
-      this.lastWord = wordEl;
+      Object.assign(this, { lastWord: wordEl, lastInRun: inRun, lastRtl: rtl });
     });
     this.wordsEl.append(frag);
   }
@@ -213,7 +224,8 @@ class Typer {
       return true;
     }
     const want = this.chars[this.pos];
-    const ch = e.key === want && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey ? e.key : resolveChar(e);
+    // The right key counts whichever keyboard language the computer is set to.
+    const ch = want && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === want || isKeyFor(e, want)) ? want : resolveChar(e);
     if (!ch) return false;
     e.preventDefault();
     if (!this.startTime) this.start();
@@ -273,7 +285,8 @@ class Typer {
       y = last.offsetTop;
     }
     this.caret.style.transform = `translate(${x - 1}px, ${y}px)`;
-    const lineStep = this.wordsEl.children[1] ? this.wordsEl.children[1].offsetHeight : 0;
+    const firstWord = this.wordsEl.querySelector('.word');
+    const lineStep = firstWord ? firstWord.offsetHeight : 0;
     if (lineStep) {
       const line = Math.floor((y + 2) / lineStep);
       this.wordsEl.style.transform = `translateY(${-Math.max(0, line - 1) * lineStep}px)`;

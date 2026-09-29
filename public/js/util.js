@@ -20,6 +20,9 @@ const pick = a => a[rand(a.length)];
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const isHebrew = c => /^[א-ת]$/.test(c);
+// A letter of the language being practised (Hebrew by default, English when switched).
+const isLangLetter = c => (LANG === 'en' ? /^[a-z]$/i.test(c) : isHebrew(c));
+const IN_LANG = LANG === 'en' ? 'באנגלית' : 'בעברית';
 const fmtTime = secs => secs >= 3600
   ? `${Math.floor(secs / 3600)}:${String(Math.floor((secs % 3600) / 60)).padStart(2, '0')}h`
   : secs >= 60 ? `${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')}` : `${Math.round(secs)}s`;

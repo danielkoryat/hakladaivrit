@@ -35,6 +35,7 @@
     else if (page === 'admin') viewAdmin();
     else if (page === 'privacy') viewPrivacy();
     else if (page === 'guide') viewGuide();
+    else if (page === 'english') viewEnglish();
     else if (page === 'game') viewGame();
     else if (page === 'leaderboard') viewLeaderboard();
     else if (page === 'texts' && arg === 'mine') viewMyTexts();
@@ -50,7 +51,7 @@
   // Internal links switch pages without reloading.
   document.addEventListener('click', e => {
     const a = e.target.closest('a[href^="/"]');
-    if (!a || a.target || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!a || a.target || /[?&]lang=/.test(a.getAttribute('href')) || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     navigate(a.getAttribute('href'));
   });
@@ -112,16 +113,10 @@
     if (token !== Page.token) return;
     view.innerHTML = html;
     Ads.fill(view);
-    $$('[data-audience]', view).forEach(b => b.addEventListener('click', () => {
-      Prefs.kids = b.dataset.audience === 'kids';
-      $('#kids-toggle').classList.toggle('active', Prefs.kids);
-      Account.emit();
-      Page.navigate(Prefs.kids ? '/game' : '/test');
-    }));
 
     // A little demo: the hands "type" a phrase on the home keyboard.
     const kb = Keyboard($('#home-kb'), { colored: true, hands: true });
-    const demo = [...'שלום עולם '];
+    const demo = [...(LANG === 'en' ? 'hello world ' : 'שלום עולם ')];
     let i = 0;
     const timer = setInterval(() => {
       if (!document.hidden) { kb.highlight(demo[i]); i = (i + 1) % demo.length; }
@@ -131,10 +126,10 @@
 
   // ---------- Test ----------
   function viewTest() {
-    document.title = 'מבחן הקלדה בעברית: בדקו את מהירות ההקלדה שלכם | הקלדה עיוורת';
+    document.title = `מבחן הקלדה ${IN_LANG}: בדקו את מהירות ההקלדה שלכם | הקלדה עיוורת`;
     const cfg = Object.assign({ mode: 'time', time: 30, words: 25, punct: false, nums: false, kb: true }, Store.get('testCfg', {}));
     const challenge = Share.challenge('מילים לדקה');
-    const words = n => randomWords(n, { ...cfg, kids: Prefs.kids });
+    const words = n => randomWords(n, cfg);
     view.innerHTML = `
       <section class="page">
         ${challenge ? challenge.html : ''}
@@ -226,8 +221,8 @@
     }
 
     function showResult(s, tp) {
-      const mode = cfg.mode === 'quote' ? 'quote' : `${cfg.mode}-${cfg[cfg.mode]}${cfg.punct ? '-p' : ''}${cfg.nums ? '-n' : ''}`;
-      const label = cfg.mode === 'time' ? `זמן ${cfg.time}` : cfg.mode === 'words' ? `מילים ${cfg.words}` : 'ציטוט';
+      const mode = (LANG === 'en' ? 'en-' : '') + (cfg.mode === 'quote' ? 'quote' : `${cfg.mode}-${cfg[cfg.mode]}${cfg.punct ? '-p' : ''}${cfg.nums ? '-n' : ''}`);
+      const label = (cfg.mode === 'time' ? `זמן ${cfg.time}` : cfg.mode === 'words' ? `מילים ${cfg.words}` : 'ציטוט') + (LANG === 'en' ? ' · אנגלית' : '');
       const { isPb, reward } = Account.record(tp.report({ kind: 'test', mode, label }));
       const wpm = Math.round(s.wpm);
       const beat = challenge && wpm > challenge.value;
@@ -236,7 +231,6 @@
       r.hidden = false;
       r.innerHTML = `
         ${beat ? `<div class="pb win-banner">ניצחתם את האתגר של ${challenge.name ? esc(challenge.name) : 'החבר/ה'}! 💪</div>` : ''}
-        ${Prefs.kids ? `<h2 class="result-title">${cheer()}</h2>` : ''}
         ${isPb ? '<div class="pb">שיא אישי חדש!</div>' : ''}
         <div class="result-top">
           ${statBox('מילים לדקה', Math.round(s.wpm), true)}
@@ -259,10 +253,10 @@
         ${Ads.slot('results')}`;
       Ads.fill(r);
       $('#result .actions').append(Share.button(() => ({
-        title: 'הקלדתי בעברית', big: wpm, unit: 'מילים לדקה',
+        title: `הקלדתי ${IN_LANG}`, big: wpm, unit: 'מילים לדקה',
         chips: [`דיוק ${Math.round(s.acc)}%`, label, `${reward.after.rank.emoji} רמה ${reward.after.level}`],
-        url: Share.challengeUrl('/test', wpm),
-        message: `הקלדתי ${wpm} מילים לדקה בעברית ⌨️ תצליחו לנצח אותי?`,
+        url: Share.challengeUrl('/test', wpm, LANG === 'en' ? { lang: 'en' } : {}),
+        message: `הקלדתי ${wpm} מילים לדקה ${IN_LANG} ⌨️ תצליחו לנצח אותי?`,
       })));
       $('#again').onclick = () => start();
       $('#same').onclick = () => start(true);
@@ -282,9 +276,9 @@
 
   // ---------- Lessons list ----------
   function viewLessons() {
-    document.title = 'שיעורי הקלדה עיוורת בעברית: 16 שיעורים מדורגים | הקלדה עיוורת';
+    document.title = `שיעורי הקלדה עיוורת ${IN_LANG}: 16 שיעורים מדורגים | הקלדה עיוורת`;
     const prog = Account.data.lessons;
-    const done = LESSONS.filter(l => prog[l.id] && prog[l.id].stars).length;
+    const done = LESSONS.filter(l => prog[l.pid] && prog[l.pid].stars).length;
     const pct = Math.round((done / LESSONS.length) * 100);
     const groups = [...new Set(LESSONS.map(l => l.group))];
     const typeLabel = { words: 'מילים נפוצות', sentences: 'משפטים שלמים', review: 'חזרה' };
@@ -311,7 +305,7 @@
           <h2 class="section-title">${g}</h2>
           <div class="lesson-grid">
             ${LESSONS.filter(l => l.group === g).map(l => {
-              const p = prog[l.id];
+              const p = prog[l.pid];
               const keys = l.newKeys.length
                 ? `<div class="lc-keys">${l.newKeys.map(k => `<span class="kc">${esc(k)}</span>`).join('')}</div>`
                 : `<div class="lc-type">${typeLabel[l.type] || typeLabel.review}</div>`;
@@ -461,7 +455,7 @@
       dimTo: lesson.type ? null : [...lessonLetters(idx), ' '],
       makeText: () => lessonText(lesson, idx),
       target: lesson.target,
-      save: (tp, stars) => Account.record(tp.report({ kind: 'lesson', mode: `lesson-${id}`, label: `שיעור ${id}`, lessonId: id, stars })),
+      save: (tp, stars) => Account.record(tp.report({ kind: 'lesson', mode: `lesson-${lesson.pid}`, label: `שיעור ${id}${LANG === 'en' ? ' · אנגלית' : ''}`, lessonId: lesson.pid, stars })),
       next: nextLesson ? { href: `/lesson/${nextLesson.id}`, label: 'לשיעור הבא' } : { href: '/profile', label: 'לניתוח הביצועים' },
     });
   }
@@ -485,7 +479,7 @@
 
   // ---------- Practice ----------
   function viewPractice() {
-    document.title = 'תרגול הקלדה בעברית שמתמקד במקשים החלשים שלכם | הקלדה עיוורת';
+    document.title = `תרגול הקלדה ${IN_LANG} שמתמקד במקשים החלשים שלכם | הקלדה עיוורת`;
     const cfg = Object.assign({ mode: 'weak', noMistakes: true }, Store.get('practiceCfg', {}));
     const MODE_NAMES = { weak: 'מקשים חלשים', common: 'מילים נפוצות', sentences: 'משפטים' };
     view.innerHTML = `
@@ -514,7 +508,7 @@
 
     let typer = null, kb = null, round = 1;
     const heatKb = Keyboard($('#heat'));
-    const weakLetters = () => analyze(Account.data).weakKeys.map(k => k.ch).filter(isHebrew);
+    const weakLetters = () => analyze(Account.data).weakKeys.map(k => k.ch).filter(isLangLetter);
 
     function refreshHeat() {
       heatKb.heat(Account.data.keyStats);
@@ -737,7 +731,7 @@
     }
     if (a.strongestFinger) good.push(`האצבע החזקה שלך: ${a.strongestFinger.name} (${pct(a.strongestFinger.acc)} דיוק).`);
     if (a.strongKeys.length) good.push(`המקשים המדויקים והמהירים שלך: ${a.strongKeys.map(k => k.ch).join(' ')}.`);
-    const doneLessons = Object.values(d.lessons).filter(l => l.stars).length;
+    const doneLessons = LESSONS.filter(l => d.lessons[l.pid] && d.lessons[l.pid].stars).length;
     if (doneLessons) good.push(`השלמת ${doneLessons} מתוך ${LESSONS.length} שיעורים.`);
 
     if (a.weakKeys.length) bad.push(`דיוק נמוך במקשים: ${a.weakKeys.map(k => `${k.ch} (${pct(k.acc)})`).join(', ')}.`);
@@ -787,7 +781,7 @@
     const recent = tests.slice(-10);
     const delta = a.trend.prevWpm != null && a.trend.recentWpm != null ? Math.round(a.trend.recentWpm - a.trend.prevWpm) : null;
     const tile = (label, value, sub) => `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value num">${value}</div>${sub ? `<div class="tile-sub">${sub}</div>` : ''}</div>`;
-    const lessonsDone = Object.values(d.lessons).filter(l => l.stars).length;
+    const lessonsDone = LESSONS.filter(l => d.lessons[l.pid] && d.lessons[l.pid].stars).length;
     const recentRows = d.history.slice(-15).reverse();
 
     view.innerHTML = `
@@ -1014,6 +1008,16 @@
     if (location.hash.length > 1) { const el = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (el) el.scrollIntoView(); }
   }
 
+  // ---------- English typing (landing page) ----------
+  async function viewEnglish() {
+    document.title = 'הקלדה עיוורת באנגלית: מבחן, שיעורים ותרגול בחינם | הקלדה עיוורת';
+    const token = Page.token;
+    const html = await content('english');
+    if (token !== Page.token) return;
+    view.innerHTML = html;
+    Ads.fill(view);
+  }
+
   // ---------- Privacy policy ----------
   function viewPrivacy() {
     document.title = 'מדיניות פרטיות | הקלדה עיוורת';
@@ -1054,16 +1058,13 @@
   }
   Account.on(renderGameChip);
 
-  const kidsBtn = $('#kids-toggle');
-  const renderKids = () => { kidsBtn.classList.toggle('active', Prefs.kids); kidsBtn.title = Prefs.kids ? 'מצב ילדים פעיל' : 'מצב ילדים'; };
-  kidsBtn.addEventListener('click', () => {
-    Prefs.kids = !Prefs.kids;
-    renderKids();
-    renderGameChip();
-    toast(Prefs.kids ? 'מצב ילדים: אותיות גדולות ומילים פשוטות 🧒' : 'חזרה למצב רגיל');
-    route();
+  // ---------- Typing language ----------
+  $('#lang-toggle').addEventListener('click', () => {
+    Store.set('lang', LANG === 'en' ? 'he' : 'en');
+    const u = new URL(location.href);
+    u.searchParams.delete('lang');
+    location.replace(u);
   });
-  renderKids();
 
   // ---------- Theme ----------
   const THEME_COLORS = { light: '#fbf8f3', dark: '#15141f' };

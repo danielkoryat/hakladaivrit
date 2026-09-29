@@ -15,7 +15,7 @@ function cleanForTyping(raw) {
     .replace(/[֑-ׇ]/g, m => (m === '־' ? ' ' : ''))   // niqqud and cantillation; maqaf becomes a space
     .replace(/[״“”„«»]/g, '"').replace(/[׳‘’‚`]/g, "'")
     .replace(/[‐-―−]/g, '-').replace(/…/g, '...')
-    .replace(/[^א-ת A-Za-z0-9.,?!:;"'()\-\s]/g, '')
+    .replace(/[^א-ת -~\s]/g, '')   // Hebrew, English and everything else on the keyboard
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -53,7 +53,7 @@ async function viewTexts() {
   const token = Page.token;
   const data = await loadTexts();
   if (token !== Page.token) return;
-  let filter = Prefs.kids ? 'kids' : 'all';
+  let filter = 'all';
   const cats = data.categories;
 
   view.innerHTML = `
@@ -75,15 +75,15 @@ async function viewTexts() {
 
   const done = Gamify.state(Account.data).texts;
   function render() {
-    const f = [['all', 'הכל'], ['kids', '🧒 לילדים'], ...Object.entries(cats)];
+    const f = [['all', 'הכל'], ...Object.entries(cats)];
     $('#filters').innerHTML = f.map(([k, n]) => `<button class="cfg-btn${k === filter ? ' active' : ''}" data-f="${k}">${n}</button>`).join('');
-    const list = data.texts.filter(t => filter === 'all' || (filter === 'kids' ? t.audience === 'kids' : t.category === filter));
+    const list = data.texts.filter(t => filter === 'all' || t.category === filter);
     $('#grid').innerHTML = list.map(t => `
       <a class="text-card cat-${t.category}" href="/texts/${t.slug}">
         <span class="tc-top"><span class="tc-cat">${esc(cats[t.category] || '')}</span>${done[t.slug] ? `<span class="tc-done">✓ <span class="num">${done[t.slug]}</span> מ/ד</span>` : ''}</span>
         <b class="tc-title">${esc(t.title)}</b>
         <span class="tc-intro">${esc(t.intro)}</span>
-        <span class="tc-meta">${t.audience === 'kids' ? '<span class="tag kids-tag">לילדים</span>' : ''}<span class="tag">${esc(t.level)}</span><span class="tag"><span class="num">${t.text.split(' ').length}</span> מילים</span></span>
+        <span class="tc-meta"><span class="tag">${esc(t.level)}</span><span class="tag"><span class="num">${t.text.split(' ').length}</span> מילים</span></span>
       </a>`).join('');
   }
   $('#filters').addEventListener('click', e => {
@@ -158,7 +158,7 @@ async function viewText(slug) {
     <section class="page">
       <div class="lesson-head">
         <a class="back" href="/texts">→ כל הטקסטים</a>
-        <div class="lesson-meta">${esc(data.categories[t.category] || '')} · ${esc(t.level)}${t.audience === 'kids' ? ' · לילדים' : ''}</div>
+        <div class="lesson-meta">${esc(data.categories[t.category] || '')} · ${esc(t.level)}</div>
         <h1>${esc(t.title)}</h1>
         <p>${esc(t.intro)}</p>
       </div>
@@ -180,7 +180,7 @@ async function viewText(slug) {
     const r = $('#result');
     r.hidden = false;
     r.innerHTML = `
-      <h2 class="result-title">${beat ? 'ניצחתם את האתגר! 💪' : Prefs.kids ? cheer() : 'סיימתם את הטקסט'}</h2>
+      <h2 class="result-title">${beat ? 'ניצחתם את האתגר! 💪' : 'סיימתם את הטקסט'}</h2>
       ${resultHtml(s)}
       <div class="actions" id="r-actions">
         <a class="btn primary" href="/texts/${next.slug}">לטקסט הבא ${ICON.next}</a>
@@ -214,7 +214,7 @@ function viewMyTexts() {
       </div>
       <div class="panel">
         <label class="field">שם (לא חובה)<input id="m-title" maxlength="60" placeholder="למשל: סיכום היסטוריה, פרק 3"></label>
-        <label class="field">הטקסט<textarea id="m-text" rows="8" placeholder="הדביקו כאן את הטקסט..."></textarea></label>
+        <label class="field">הטקסט<textarea id="m-text" rows="8" dir="auto" placeholder="הדביקו כאן טקסט בעברית, באנגלית או בשתיהן..."></textarea></label>
         <div class="mine-row">
           <label class="btn ghost upload">${ICON.upload} טעינת קובץ טקסט<input type="file" id="m-file" accept=".txt,text/plain" hidden></label>
           <span class="muted small" id="m-count"></span>
@@ -323,5 +323,3 @@ function practiseMine(t) {
   start();
 }
 
-// Encouragement for kids.
-function cheer() { return pick(['כל הכבוד! 🎉', 'אלופים! 🏆', 'מעולה! ⭐', 'וואו, איזה יופי! 🚀', 'יש! עוד צעד קדימה 💪']); }

@@ -21,12 +21,10 @@ function pseudoWord(letters, focus, len) {
   return w.join('');
 }
 
-// Simple, short words for kids mode.
-const KID_WORDS = WORDS.filter(w => [...w].length <= 4);
 
-function randomWords(n, { punct = false, nums = false, kids = false } = {}) {
+function randomWords(n, { punct = false, nums = false } = {}) {
   const out = [];
-  const pool = kids ? KID_WORDS : WORDS;
+  const pool = WORDS;
   for (let i = 0; i < n; i++) {
     let w;
     do { w = pick(pool); } while (out.length && w === out[out.length - 1]);
@@ -59,12 +57,15 @@ function weightedWords(n, focus, boost = 6) {
 
 function lessonLetters(idx) {
   const set = [];
-  for (let i = 0; i <= idx; i++) LESSONS[i].newKeys.forEach(k => { if (isHebrew(k) && !set.includes(k)) set.push(k); });
+  for (let i = 0; i <= idx; i++) LESSONS[i].newKeys.forEach(k => { if (isLangLetter(k) && !set.includes(k)) set.push(k); });
   return set;
 }
 
 function lessonText(lesson, idx) {
   if (lesson.type === 'words') return randomWords(30);
+  if (lesson.type === 'caps') {
+    return randomWords(26).split(' ').map((w, i) => (i % 2 === 0 || Math.random() < 0.3 ? w[0].toUpperCase() + w.slice(1) : w)).join(' ');
+  }
   if (lesson.type === 'sentences') return shuffle(SENTENCES).slice(0, 4).join(' ');
   if (lesson.type === 'punct') {
     const words = randomWords(24).split(' ');
@@ -105,8 +106,8 @@ function lessonText(lesson, idx) {
 
 // Text for a personalised lesson: short drills on the focus keys, then real words rich in them.
 function focusText(keys, { words = [], length = 28 } = {}) {
-  const letters = keys.filter(isHebrew);
-  const others = keys.filter(k => !isHebrew(k) && k !== ' ');
+  const letters = keys.filter(isLangLetter);
+  const others = keys.filter(k => !isLangLetter(k) && k !== ' ');
   const parts = [];
   letters.forEach(k => parts.push(k.repeat(3)));
   if (letters.length >= 2) {

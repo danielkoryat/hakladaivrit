@@ -3,13 +3,17 @@
 // Balloon game: balloons with letters (or short words) float up; type them to pop them
 // before they escape. Made for kids, fun for everyone.
 
-const GAME_MODES = {
-  home: { name: 'שורת הבית', desc: 'רק האותיות ש ד ג כ ח ל ך ף', emoji: '🏠', letters: ['ש', 'ד', 'ג', 'כ', 'ח', 'ל', 'ך', 'ף'] },
+const GAME_MODES = LANG === 'en' ? {
+  home: { name: 'שורת הבית', desc: 'רק האותיות a s d f j k l', emoji: '🏠', letters: ['a', 's', 'd', 'f', 'j', 'k', 'l'], extra: ['g', 'h'] },
+  letters: { name: 'כל האותיות', desc: 'כל 26 האותיות האנגליות', emoji: '🔤' },
+  words: { name: 'מילים', desc: 'מילים קצרות באנגלית, אות אחרי אות', emoji: '📝' },
+} : {
+  home: { name: 'שורת הבית', desc: 'רק האותיות ש ד ג כ ח ל ך ף', emoji: '🏠', letters: ['ש', 'ד', 'ג', 'כ', 'ח', 'ל', 'ך', 'ף'], extra: ['ע', 'י'] },
   letters: { name: 'כל האותיות', desc: 'כל אותיות האלפבית, כולל סופיות', emoji: '🔤' },
   words: { name: 'מילים', desc: 'מילים קצרות, אות אחרי אות', emoji: '📝' },
 };
-const ALL_LETTERS = [...'אבגדהוזחטיכלמנסעפצקרשתךםןףץ'];
-const SHORT_WORDS = WORDS.filter(w => [...w].length >= 2 && [...w].length <= 4 && /^[א-ת]+$/.test(w));
+const ALL_LETTERS = [...(LANG === 'en' ? 'abcdefghijklmnopqrstuvwxyz' : 'אבגדהוזחטיכלמנסעפצקרשתךםןףץ')];
+const SHORT_WORDS = WORDS.filter(w => [...w].length >= 2 && [...w].length <= 4 && (LANG === 'en' ? /^[a-z]+$/ : /^[א-ת]+$/).test(w));
 
 const Sound = {
   get on() { return Store.get('sound', true); },
@@ -119,7 +123,7 @@ function viewGame() {
   function pool() {
     if (mode === 'words') return SHORT_WORDS;
     if (mode === 'letters') return ALL_LETTERS;
-    return st && st.level >= 3 ? [...GAME_MODES.home.letters, 'ע', 'י'] : GAME_MODES.home.letters;
+    return st && st.level >= 3 ? [...GAME_MODES.home.letters, ...GAME_MODES.home.extra] : GAME_MODES.home.letters;
   }
 
   function start() {
@@ -143,7 +147,7 @@ function viewGame() {
     const el = document.createElement('div');
     el.className = 'balloon' + (mode === 'words' ? ' wordy' : '');
     el.style.setProperty('--hue', String(rand(360)));
-    el.innerHTML = `<span class="b-label" dir="rtl">${mode === 'words' ? [...label].map(c => `<i>${esc(c)}</i>`).join('') : esc(label)}</span>`;
+    el.innerHTML = `<span class="b-label" dir="auto">${mode === 'words' ? [...label].map(c => `<i>${esc(c)}</i>`).join('') : esc(label)}</span>`;
     area.append(el);
     const bw = el.offsetWidth || 80;
     const b = { el, label, chars: [...label], typed: 0, x: 10 + Math.random() * Math.max(10, W - bw - 20), y: H + 10, w: bw, sway: Math.random() * Math.PI * 2 };
@@ -166,7 +170,7 @@ function viewGame() {
     if (!st || !st.running) return;
     const dt = Math.min(0.05, (now - st.last) / 1000);
     st.last = now;
-    const speed = (mode === 'words' ? 26 + st.level * 5 : 38 + st.level * 7) * (Prefs.kids ? 0.85 : 1);
+    const speed = (mode === 'words' ? 26 + st.level * 5 : 38 + st.level * 7);
     st.spawnIn -= dt * 1000;
     const maxAlive = mode === 'words' ? 3 + Math.floor(st.level / 3) : 4 + Math.floor(st.level / 2);
     if (st.spawnIn <= 0 && st.balloons.length < maxAlive) {
@@ -199,6 +203,16 @@ function viewGame() {
     area.classList.add('hurt');
     hud();
     if (st.hearts <= 0) gameOver();
+  }
+
+  // Tells the player which letter they typed, so a near miss (ך instead of ר) is obvious.
+  function missHint(ch, want) {
+    area.querySelector('.miss-hint')?.remove();
+    const el = document.createElement('div');
+    el.className = 'miss-hint';
+    el.innerHTML = want ? `הקלדתם <b>${esc(ch)}</b> והאות הבאה היא <b>${esc(want)}</b>` : `הקלדתם <b>${esc(ch)}</b> ואין בלון כזה`;
+    area.append(el);
+    setTimeout(() => el.remove(), 1100);
   }
 
   function pop(b) {
@@ -258,7 +272,7 @@ function viewGame() {
     }
     if (kb) kb.flash(e.code, hit);
     if (hit) st.good++;
-    else { st.combo = 0; Sound.play('miss'); hud(); }
+    else { st.combo = 0; Sound.play('miss'); missHint(ch, st.lock ? st.lock.chars[st.lock.typed] : null); hud(); }
   }
 
   function resume() {

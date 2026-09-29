@@ -5,12 +5,21 @@ const BASE = {}, FINGER = {}, REVERSE = {}, ROW_OF = {};
 KEY_ROWS.forEach((row, ri) => row.forEach(([code, he, , finger]) => {
   FINGER[code] = finger;
   if (finger === 'mod') return;
-  const ch = code === 'Space' ? ' ' : he;
+  const ch = code === 'Space' ? ' ' : LANG === 'en' ? EN_KEYS[code][0] : he;
   BASE[code] = ch;
   REVERSE[ch] = { code, shift: false };
   ROW_OF[ch] = ri;
 }));
-Object.entries(SHIFT_CHARS).forEach(([code, ch]) => { REVERSE[ch] = { code, shift: true }; });
+Object.entries(SHIFT_CHARS).forEach(([code, ch]) => { if (!REVERSE[ch]) REVERSE[ch] = { code, shift: true }; });
+
+// Every character either layout can produce, by physical key. Pasted text can mix Hebrew
+// and English, and a key press counts when it is the right key in either layout.
+const KEY_OF = { ...REVERSE };
+const addKey = (ch, code, shift) => { if (ch && !KEY_OF[ch]) KEY_OF[ch] = { code, shift }; };
+KEY_ROWS.flat().forEach(([code, he, , f]) => { if (f !== 'mod' && code !== 'Space') addKey(he, code, false); });
+Object.entries(HE_SHIFT).forEach(([code, ch]) => addKey(ch, code, true));
+Object.entries(EN_KEYS).forEach(([code, [lo, up]]) => { addKey(lo, code, false); addKey(up, code, true); });
+const isKeyFor = (e, ch) => { const k = KEY_OF[ch]; return !!k && k.code === e.code && k.shift === e.shiftKey; };
 
 const ROW_NAMES = ['שורת המספרים', 'השורה העליונה', 'שורת הבית', 'השורה התחתונה'];
 const HOME_KEY = { lp: 'KeyA', lr: 'KeyS', lm: 'KeyD', li: 'KeyF', ri: 'KeyJ', rm: 'KeyK', rr: 'KeyL', rp: 'Semicolon' };
@@ -28,7 +37,7 @@ const fingerOfChar = ch => { const r = REVERSE[ch]; return r ? FINGER[r.code] : 
 // even when the OS keyboard layout is set to English.
 function resolveChar(e) {
   if (e.ctrlKey || e.metaKey || e.altKey) return null;
-  if (isHebrew(e.key)) return e.key;
+  if (LANG === 'en' ? /^[A-Za-z]$/.test(e.key) : isHebrew(e.key)) return e.key;
   const mapped = e.shiftKey ? SHIFT_CHARS[e.code] : BASE[e.code];
   if (mapped) return mapped;
   return e.key && e.key.length === 1 ? e.key : null;
@@ -289,12 +298,18 @@ function Hands(stage, kb, keys) {
 }
 
 // ---------- On-screen keyboard ----------
+// The practised language's character is the big label, the other one sits in the corner.
+function keyLabels(he, en) {
+  const [main, corner] = LANG === 'en' && en ? [en, he === en ? '' : he] : [he, en];
+  return `<span class="k-he">${esc(main)}</span>${corner ? `<span class="k-en">${esc(corner)}</span>` : ''}`;
+}
+
 function Keyboard(el, { colored = false, hands = false } = {}) {
   el.innerHTML = `<div class="kb-stage${hands ? ' with-hands' : ''}">` +
     `<div class="kb${colored ? ' colored' : ''}" dir="ltr">${KEY_ROWS.map(row =>
       `<div class="kb-row">${row.map(([code, he, en, f, w = 1]) =>
         `<div class="key f-${f}${code === 'KeyF' || code === 'KeyJ' ? ' bump' : ''}" data-code="${code}" style="--w:${w}">` +
-        `<span class="k-he">${esc(he)}</span>${en ? `<span class="k-en">${esc(en)}</span>` : ''}</div>`).join('')}</div>`).join('')}</div>` +
+        keyLabels(he, en) + '</div>').join('')}</div>`).join('')}</div>` +
     `${hands ? '<div class="hands" aria-hidden="true"></div>' : ''}</div>`;
   const keys = {};
   $$('.key', el).forEach(k => { keys[k.dataset.code] = k; });
@@ -307,7 +322,7 @@ function Keyboard(el, { colored = false, hands = false } = {}) {
     highlight(ch) {
       lit.forEach(k => k.classList.remove('next'));
       lit = [];
-      const r = ch == null ? null : REVERSE[ch];
+      const r = ch == null ? null : KEY_OF[ch];
       if (!r) { if (handsApi) handsApi.point({}); return null; }
       const f = FINGER[r.code];
       const t = {};

@@ -2,7 +2,8 @@
 
 Hebrew touch-typing site for kids and adults: typing test, 16 graded lessons, adaptive practice,
 a balloon typing game, a library of educational texts, practice on your own text, XP / levels /
-streaks / badges, a leaderboard, shareable result cards, animated on-screen hands, kids mode,
+streaks / badges, a leaderboard, shareable result cards, animated on-screen hands,
+English typing (a header switch, Hebrew by default; pasted text may mix both languages),
 light and dark themes, Google sign-in, Google Analytics and AdSense support.
 Runs free on **Cloudflare Workers** with a **D1** database.
 
@@ -116,10 +117,11 @@ It shows registered users, sign-ups, active users per day, completed activities 
 - `wrangler.jsonc` – Cloudflare configuration and site settings
 - `public/` – the site (served as static files)
   - `js/data.js` – keyboard layout, lessons, word list, sentences, quotes
+  - `js/data-en.js` – typing language switch (Hebrew default, English optional): US layout, English lessons, words, sentences, quotes
   - `js/keyboard.js` – on-screen keyboard and animated hands
   - `js/text.js` – exercise text generation
   - `js/account.js` – sign-in, profile data, Google Analytics, ads, analysis, personalised lessons
-  - `js/core.js` – shared page context, preferences (hands, kids mode), icons, typing engine
+  - `js/core.js` – shared page context, preferences (hands), icons, typing engine
   - `js/gamify.js` – XP, levels, streaks, daily goal, badges, celebrations
   - `js/share.js` – result card image, share window, challenge links
   - `js/game.js` – balloon typing game

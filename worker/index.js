@@ -224,7 +224,7 @@ async function leaderboard(env, board, me) {
   } else {
     sql = `SELECT r.user_id AS uid, ROUND(MAX(r.wpm)) AS value, ${cols} FROM results r JOIN users u ON u.id = r.user_id
            LEFT JOIN user_state s ON s.user_id = r.user_id
-           WHERE r.kind = 'test' AND r.chars >= 50 AND r.acc >= 90 AND r.at >= ?1 AND COALESCE(s.show_on_board, 1) = 1
+           WHERE r.kind = 'test' AND r.mode NOT LIKE 'en-%' AND r.chars >= 50 AND r.acc >= 90 AND r.at >= ?1 AND COALESCE(s.show_on_board, 1) = 1
            GROUP BY r.user_id ORDER BY value DESC LIMIT 25`;
     bind = [board === 'all' ? 0 : week];
   }
@@ -474,6 +474,8 @@ const PAGES = {
     desc: 'טקסטים קצרים ומעניינים לתרגול הקלדה עיוורת בעברית: היסטוריה, מדע וחלל, בעלי חיים והשפה העברית. אפשר גם לתרגל על חומר הלימוד שלכם.' },
   '/leaderboard': { title: 'טבלת האלופים: המקלידים המהירים בעברית | הקלדה עיוורת', priority: '0.6', crumb: 'טבלת האלופים', info: 'leaderboard',
     desc: 'מי מקליד הכי מהר בעברית? טבלת המהירות השבועית, טבלת כל הזמנים, משחק הבלונים ונקודות XP.' },
+  '/english': { title: 'הקלדה עיוורת באנגלית: מבחן, שיעורים ותרגול בחינם | הקלדה עיוורת', priority: '0.8', crumb: 'הקלדה באנגלית', content: 'english',
+    desc: 'לומדים הקלדה עיוורת באנגלית בחינם: 16 שיעורים מדורגים, מבחן מהירות, תרגול חכם ומשחק, עם הסברים בעברית וידיים שמראות איזו אצבע ללחוץ.' },
   '/texts/mine': { title: 'תרגול הקלדה על טקסט משלכם | הקלדה עיוורת', desc: HOME_DESC, noindex: true },
   '/privacy': { title: 'מדיניות פרטיות | הקלדה עיוורת', priority: '0.3', crumb: 'מדיניות פרטיות',
     desc: 'איזה מידע האתר הקלדה עיוורת אוסף, איך הוא משמש ואיך אפשר למחוק אותו.' },
@@ -721,6 +723,7 @@ async function llmsTxt(env, url, origin) {
 - [שיעורי הקלדה](${origin}/lessons): קורס של ${all.length} שיעורים מדורגים.
 - [תרגול חכם](${origin}/practice): תרגול שמתמקד במקשים החלשים של המשתמש.
 - [משחק הבלונים](${origin}/game): משחק הקלדה לילדים. מפוצצים בלונים עם אותיות ומילים.
+- [הקלדה עיוורת באנגלית](${origin}/english): אותם שיעורים, מבחן, תרגול ומשחק באנגלית, עם הסברים בעברית.
 - [טקסטים להקלדה](${origin}/texts): טקסטים קצרים על היסטוריה, מדע, טבע והשפה העברית, ותרגול על חומר לימוד אישי.
 - [טבלת האלופים](${origin}/leaderboard): טבלת מהירות שבועית, משחק ונקודות XP.
 
