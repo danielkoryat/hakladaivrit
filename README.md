@@ -33,10 +33,13 @@ npx wrangler secret put ADMIN_EMAILS     # e.g. you@gmail.com, comma separate se
 
 ### Automatic deploys
 
-Cloudflare rebuilds the site on every push to `main` (Workers Builds, free):
-Cloudflare dashboard → **Workers & Pages → hakladaivrit → Settings → Builds → Connect**,
-choose this GitHub repository, then set **Build command** `npm test` and
-**Deploy command** `npm run deploy` (applies database migrations, then publishes).
+Every push to `main` runs the tests, applies database migrations and publishes the site to
+https://hakladaivrit.com (GitHub Actions, `.github/workflows/deploy.yml`). It needs, under the
+repository's **Settings → Secrets and variables → Actions**:
+
+- secret `CLOUDFLARE_API_TOKEN` – a Cloudflare API token (template **Edit Cloudflare Workers**,
+  plus **Account → D1 → Edit** and **Zone → DNS → Edit** for your domain)
+- variable `CLOUDFLARE_ACCOUNT_ID` – shown by `npx wrangler whoami`
 
 To publish by hand instead: `npm run deploy`.
 
