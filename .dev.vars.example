@@ -1,0 +1,15 @@
+# Local development settings (used by `npm run dev`). Copy to .dev.vars and fill in.
+# In production the values in wrangler.jsonc "vars" are used instead.
+
+# "Sign in with Google" client ID. Add http://localhost and http://localhost:5000
+# to its Authorized JavaScript origins in Google Cloud Console.
+GOOGLE_CLIENT_ID=
+
+# Google accounts (emails) that can open the admin dashboard, comma separated.
+ADMIN_EMAILS=
+
+# Google Analytics 4 measurement ID (G-XXXXXXXXXX). Usually left empty locally.
+GA_MEASUREMENT_ID=
+
+# Set to 1 to show placeholder boxes where ads will appear.
+ADS_PREVIEW=0

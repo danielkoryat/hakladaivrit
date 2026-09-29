@@ -1,0 +1,53 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hakladaivrit",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-01",
+
+  // The site's files. Everything except the paths below is served straight from ./public
+  // (static requests are free and don't count toward the Worker request limit).
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/", "/ads.txt"]
+  },
+
+  // Accounts, scores and statistics. Create it once with:  npx wrangler d1 create hakladaivrit
+  // then paste the printed database_id here.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hakladaivrit",
+      "database_id": "46fc6b32-1449-4065-b326-7401e72efa97",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Your domain (must be in the same Cloudflare account). www redirects to the bare domain.
+  "routes": [
+    { "pattern": "hakladaivrit.com", "custom_domain": true },
+    { "pattern": "www.hakladaivrit.com", "custom_domain": true }
+  ],
+
+  // Remove expired login sessions once a day.
+  "triggers": { "crons": ["17 3 * * *"] },
+
+  // Site settings (public). Change them here and push to main (or run `npm run deploy`).
+  // For local development, override them in .dev.vars (see .dev.vars.example).
+  // ADMIN_EMAILS is kept out of the repo as a Cloudflare secret:
+  //   npx wrangler secret put ADMIN_EMAILS
+  "vars": {
+    "GOOGLE_CLIENT_ID": "964033939737-6a5je6rl6ptsjbmisoqb9vd29l608ith.apps.googleusercontent.com",
+    "GA_MEASUREMENT_ID": "",
+    "ADSENSE_CLIENT": "",
+    "ADSENSE_SLOT_HOME": "",
+    "ADSENSE_SLOT_RESULTS": "",
+    "ADSENSE_SLOT_LESSONS": "",
+    "ADSENSE_SLOT_PROFILE": "",
+    "ADS_PREVIEW": "0",
+    "CONTACT_EMAIL": "",
+    "REPORT_TZ": "Asia/Jerusalem"
+  },
+
+  "observability": { "enabled": true }
+}

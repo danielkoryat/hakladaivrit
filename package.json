@@ -1,0 +1,15 @@
+{
+  "name": "hebrew-blind-typing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hebrew touch-typing site on Cloudflare Workers: typing test, lessons, adaptive practice, Google sign-in",
+  "scripts": {
+    "dev": "wrangler d1 migrations apply hakladaivrit --local && wrangler dev --port 5000",
+    "deploy": "wrangler d1 migrations apply hakladaivrit --remote && wrangler deploy",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "wrangler": "^4.143.0"
+  },
+  "type": "module"
+}

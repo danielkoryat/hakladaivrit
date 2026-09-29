@@ -1,0 +1,97 @@
+# הקלדה עיוורת בעברית
+
+Hebrew touch-typing site: typing test, graded lessons, adaptive practice, animated
+on-screen hands, "Sign in with Google" accounts, personalised lessons, Google Analytics
+and Google AdSense support. Runs free on **Cloudflare Workers** with a **D1** database.
+
+## Run locally
+
+```
+npm install      # first time only
+npm run dev
+```
+
+Open **http://localhost:5000** (Google sign-in needs `localhost`, not `127.0.0.1`).
+Local settings live in `.dev.vars` (copy `.dev.vars.example`); the local database is kept in `.wrangler/`.
+
+## Deploy to Cloudflare (free)
+
+One-time setup:
+
+1. `npx wrangler login` — opens the browser to connect your Cloudflare account.
+2. `npx wrangler d1 create hakladaivrit` — copy the printed `database_id` into `wrangler.jsonc`.
+3. In `wrangler.jsonc` → `vars`, set `GOOGLE_CLIENT_ID` (and later
+   `GA_MEASUREMENT_ID`, `ADSENSE_*`, `CONTACT_EMAIL`).
+4. The domain in `wrangler.jsonc` → `routes` must be in the same Cloudflare account. If it already
+   has DNS records for the bare domain or `www`, delete them first (the deploy creates its own).
+
+Admin accounts are a Cloudflare secret (kept out of the repo):
+
+```
+npx wrangler secret put ADMIN_EMAILS     # e.g. you@gmail.com, comma separate several
+```
+
+### Automatic deploys
+
+Cloudflare rebuilds the site on every push to `main` (Workers Builds, free):
+Cloudflare dashboard → **Workers & Pages → hakladaivrit → Settings → Builds → Connect**,
+choose this GitHub repository, then set **Build command** `npm test` and
+**Deploy command** `npm run deploy` (applies database migrations, then publishes).
+
+To publish by hand instead: `npm run deploy`.
+
+Free-plan limits: 100,000 page/API requests per day (static files don't count), 5 GB database,
+5M database rows read and 100k written per day.
+
+## Sign in with Google
+
+In Google Cloud Console → **Google Auth Platform**:
+
+- **Clients → your Web client → Authorized JavaScript origins**: `http://localhost`,
+  `http://localhost:5000`, `https://hakladaivrit.com`, `https://www.hakladaivrit.com`.
+- **Branding**: home page `https://hakladaivrit.com`, privacy policy
+  `https://hakladaivrit.com/#/privacy`, authorized domain `hakladaivrit.com`.
+- **Audience**: **Publish app** (until then only listed test users can sign in).
+
+The worker verifies every Google token's signature, audience, expiry and verified email itself
+(`lib/google-auth.js`, tested by `npm test`).
+
+## Visitor statistics (Google Analytics)
+
+1. At https://analytics.google.com create a property with a **Web** data stream for your domain and
+   copy its measurement ID (`G-XXXXXXXXXX`) into `GA_MEASUREMENT_ID`.
+2. In the data stream's **Enhanced measurement → Page views → advanced settings**, turn off
+   **"Page changes based on browser history events"** — the site sends its own page views
+   (`/test`, `/lesson/3`, …), so leaving it on double-counts.
+
+Custom events: `training_complete` (`activity`, `wpm`, `accuracy`), `sign_up`, `login`.
+Not loaded for admin accounts or visitors with Global Privacy Control.
+
+## Admin dashboard
+
+Put your Google account email in the `ADMIN_EMAILS` secret (see above), sign in and click **ניהול**.
+It shows registered users, sign-ups, active users per day, completed activities and recent users.
+
+## Ads (Google AdSense)
+
+1. Apply at https://adsense.google.com with your live domain.
+2. Set `ADSENSE_CLIENT=ca-pub-…` and deploy: the worker adds the AdSense code and verification tag
+   and serves `/ads.txt`.
+3. Once approved, turn on Auto ads, or create display ad units and set `ADSENSE_SLOT_HOME`,
+   `ADSENSE_SLOT_RESULTS`, `ADSENSE_SLOT_LESSONS`, `ADSENSE_SLOT_PROFILE`.
+4. Enable the consent message for European visitors in AdSense → Privacy & messaging.
+
+`ADS_PREVIEW=1` (in `.dev.vars`) shows placeholder boxes where ads will appear.
+
+## Layout
+
+- `worker/index.js` – API, HTML page (security headers, AdSense), ads.txt, www redirect
+- `lib/google-auth.js` – Google token verification; `test/` – tests (`npm test`)
+- `migrations/` – database schema (applied by `npm run dev` / `npm run deploy`)
+- `wrangler.jsonc` – Cloudflare configuration and site settings
+- `public/` – the site (served as static files)
+  - `js/data.js` – keyboard layout, lessons, word list, sentences, quotes
+  - `js/keyboard.js` – on-screen keyboard and animated hands
+  - `js/text.js` – exercise text generation
+  - `js/account.js` – sign-in, profile data, Google Analytics, ads, analysis, personalised lessons
+  - `js/app.js` – typing engine, pages and routing
