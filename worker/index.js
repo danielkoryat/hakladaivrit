@@ -344,6 +344,123 @@ async function api(request, env, route, cfg) {
   return json(404, { error: 'לא נמצא' });
 }
 
+// ---------- Search engines: per-page titles, descriptions, sitemap ----------
+const SITE = 'הקלדה עיוורת';
+const HOME_DESC = 'למדו להקליד בעברית מהר ומדויק בעשר אצבעות: מבחן מהירות, 16 שיעורים מדורגים ותרגול חכם, בחינם.';
+const PAGES = {
+  '/': { title: 'הקלדה עיוורת בעברית | מבחן הקלדה, שיעורים ותרגול', desc: HOME_DESC, priority: '1.0' },
+  '/test': { title: 'מבחן הקלדה בעברית: בדקו את מהירות ההקלדה שלכם | הקלדה עיוורת', priority: '0.9', crumb: 'מבחן הקלדה',
+    desc: 'מבחן מהירות הקלדה חינמי בעברית לפי זמן, מספר מילים או ציטוט. קבלו מילים לדקה, תווים לדקה, דיוק ורשימה של המקשים שכדאי לשפר.' },
+  '/lessons': { title: 'שיעורי הקלדה עיוורת בעברית: 16 שיעורים מדורגים | הקלדה עיוורת', priority: '0.9', crumb: 'שיעורים',
+    desc: 'למדו הקלדה עיוורת בעברית צעד אחר צעד: שורת הבית, השורה העליונה והתחתונה, פיסוק ומספרים, עם ידיים וירטואליות שמראות איזו אצבע ללחוץ.' },
+  '/practice': { title: 'תרגול הקלדה בעברית שמתמקד במקשים החלשים שלכם | הקלדה עיוורת', priority: '0.8', crumb: 'תרגול',
+    desc: 'תרגול הקלדה חכם בעברית: האתר מזהה את המקשים והמילים שבהם אתם טועים ובונה תרגילים שמחזקים בדיוק אותם.' },
+  '/privacy': { title: 'מדיניות פרטיות | הקלדה עיוורת', priority: '0.3', crumb: 'מדיניות פרטיות',
+    desc: 'איזה מידע האתר הקלדה עיוורת אוסף, איך הוא משמש ואיך אפשר למחוק אותו.' },
+  '/profile': { title: 'הפרופיל שלי | הקלדה עיוורת', desc: HOME_DESC, noindex: true },
+  '/admin': { title: 'לוח ניהול | הקלדה עיוורת', desc: HOME_DESC, noindex: true },
+};
+
+// Lesson titles and descriptions come from public/js/data.js, the same file the site uses.
+let lessonCache = null;
+async function lessons(env, origin) {
+  if (lessonCache) return lessonCache;
+  const res = await env.ASSETS.fetch(new Request(origin + '/js/data.js'));
+  const src = await res.text();
+  const unq = s => s.replace(/\\'/g, "'");
+  const list = [];
+  const re = /\{\s*id:\s*(\d+),([\s\S]*?)desc:\s*'((?:[^'\\]|\\.)*)'\s*\}/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const t = /title:\s*'((?:[^'\\]|\\.)*)'/.exec(m[2]);
+    list.push({ id: Number(m[1]), title: t ? unq(t[1]) : `שיעור ${m[1]}`, desc: unq(m[3]) });
+  }
+  lessonCache = list;
+  return list;
+}
+
+async function pageMeta(env, url) {
+  const path = url.pathname.replace(/\/+$/, '') || '/';
+  if (PAGES[path]) return { path, ...PAGES[path] };
+  const lesson = /^\/lesson\/(\d+)$/.exec(path);
+  if (lesson) {
+    const all = await lessons(env, url.origin);
+    const l = all.find(x => x.id === Number(lesson[1]));
+    if (!l) return null;
+    return {
+      path, lesson: l, total: all.length, crumb: `שיעור ${l.id}`,
+      title: `שיעור ${l.id}: ${l.title} | הקלדה עיוורת`,
+      desc: `שיעור ${l.id} מתוך ${all.length} בקורס ההקלדה העיוורת בעברית. ${l.desc}`,
+    };
+  }
+  if (/^\/custom\/[\w-]+$/.test(path)) return { path, title: 'שיעור אישי | הקלדה עיוורת', desc: HOME_DESC, noindex: true };
+  return null;
+}
+
+// Public address for canonical links and the sitemap: always https except on this computer.
+const siteOrigin = url => (/^(localhost|127\.|\[::1\])/.test(url.hostname) ? url.origin : `https://${url.host}`);
+
+const attr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function structuredData(meta, origin) {
+  const home = `${origin}/`;
+  if (meta.path === '/') {
+    return {
+      '@context': 'https://schema.org',
+      '@graph': [
+        { '@type': 'WebSite', '@id': `${home}#website`, url: home, name: SITE, alternateName: 'הקלדה עיוורת בעברית', inLanguage: 'he' },
+        {
+          '@type': 'WebApplication', name: 'הקלדה עיוורת בעברית', url: home, inLanguage: 'he',
+          applicationCategory: 'EducationalApplication', operatingSystem: 'Any', isAccessibleForFree: true,
+          description: HOME_DESC, image: `${origin}/og-image.png`,
+          offers: { '@type': 'Offer', price: '0', priceCurrency: 'ILS' },
+        },
+      ],
+    };
+  }
+  const trail = [{ name: SITE, item: home }];
+  if (meta.lesson) trail.push({ name: 'שיעורים', item: `${origin}/lessons` });
+  trail.push({ name: meta.crumb, item: `${origin}${meta.path}` });
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: trail.map((t, i) => ({ '@type': 'ListItem', position: i + 1, name: t.name, item: t.item })),
+  };
+}
+
+function withMeta(html, meta, origin) {
+  const url = `${origin}${meta.path === '/' ? '/' : meta.path}`;
+  html = html
+    .replace(/<title>[^<]*<\/title>/, `<title>${attr(meta.title)}</title>`)
+    .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${attr(meta.desc)}">`)
+    .replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${attr(meta.title)}">`)
+    .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${attr(meta.desc)}">`)
+    .replace(/<meta property="og:url" content="[^"]*">/, `<meta property="og:url" content="${attr(url)}">`);
+  let head = `  <link rel="canonical" href="${attr(url)}">\n`;
+  if (meta.noindex) head += '  <meta name="robots" content="noindex">\n';
+  else if (meta.crumb || meta.path === '/') {
+    head += `  <script type="application/ld+json">${JSON.stringify(structuredData(meta, origin)).replace(/</g, '\\u003c')}</script>\n`;
+  }
+  return html.replace('</head>', `${head}</head>`);
+}
+
+async function sitemap(env, origin) {
+  const paths = Object.entries(PAGES).filter(([, p]) => !p.noindex).map(([path, p]) => [path, p.priority]);
+  (await lessons(env, origin)).forEach(l => paths.push([`/lesson/${l.id}`, '0.7']));
+  const urls = paths.map(([p, pr]) => `  <url><loc>${origin}${p}</loc><priority>${pr}</priority></url>`).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+}
+
+const robots = origin => `User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /profile
+Disallow: /admin
+Disallow: /custom/
+
+Sitemap: ${origin}/sitemap.xml
+`;
+
 // ---------- HTML page ----------
 // With ads on, Google's ad scripts load other scripts and frames from many domains, so scripts
 // are trusted by a per-request nonce ('strict-dynamic') instead of by host.
@@ -367,10 +484,11 @@ const SECURITY_HEADERS = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
 };
 
-async function servePage(request, env, cfg) {
-  const asset = await env.ASSETS.fetch(new Request(new URL('/', request.url), { headers: request.headers }));
+async function servePage(request, env, cfg, meta) {
+  const url = new URL(request.url);
+  const asset = await env.ASSETS.fetch(new Request(url.origin + '/', { headers: request.headers }));
   if (!asset.ok) return asset;
-  let html = await asset.text();
+  let html = withMeta(await asset.text(), meta, siteOrigin(url));
   let nonce = null;
   if (cfg.adsClient) {
     nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
@@ -399,8 +517,18 @@ export default {
         if (!cfg.adsClient) return new Response('Not found', { status: 404 });
         return new Response(`google.com, ${cfg.adsClient.replace(/^ca-/, '')}, DIRECT, f08c47fec0942fa0\n`, { headers: { 'Content-Type': 'text/plain' } });
       }
-      if (url.pathname === '/') return await servePage(request, env, cfg);
-      return env.ASSETS.fetch(request);
+      if (url.pathname === '/robots.txt') return new Response(robots(siteOrigin(url)), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      if (url.pathname === '/sitemap.xml') {
+        return new Response(await sitemap(env, siteOrigin(url)), { headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
+      }
+      // One canonical address per page: no trailing slash.
+      if (url.pathname.length > 1 && url.pathname.endsWith('/')) {
+        url.pathname = url.pathname.replace(/\/+$/, '');
+        return Response.redirect(url.toString(), 301);
+      }
+      const meta = await pageMeta(env, url);
+      if (meta) return await servePage(request, env, cfg, meta);
+      return env.ASSETS.fetch(request); // unknown pages get public/404.html with status 404
     } catch (e) {
       if (!e.status) console.error(e);
       return json(e.status || 500, { error: e.status ? e.message : 'שגיאת שרת' });

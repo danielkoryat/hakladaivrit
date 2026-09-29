@@ -38,7 +38,7 @@ function resolveChar(e) {
 // Hands seen from above, drawn from a simple anatomical skeleton: every finger runs from its
 // knuckle to the fingertip with joint widths, a nail and knuckle creases; the back of the hand
 // joins the knuckles to the wrist and the thumb. All shapes are painted as one silhouette
-// (outline layer under a fill layer), so only the hand's outer edge shows — like a drawing.
+// (outline layer under a fill layer), so only the hand's outer edge shows, like a drawing.
 const HAND_IDS = ['lp', 'lr', 'lm', 'li', 'lt', 'rt', 'ri', 'rm', 'rr', 'rp'];
 let handsUid = 0;
 

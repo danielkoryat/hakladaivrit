@@ -165,8 +165,8 @@ const GoogleSignIn = {
 };
 
 // ---------- Site analytics (Google Analytics 4) ----------
-// The site switches pages via the URL hash, so page views are sent manually with a clean
-// path (#/lesson/3 -> /lesson/3). Not loaded for admins or when Global Privacy Control is on.
+// The site switches pages without reloading, so page views are sent manually.
+// Not loaded for admins or when Global Privacy Control is on.
 const Analytics = {
   id: null,
   first: true,
@@ -185,8 +185,7 @@ const Analytics = {
   event(name, params = {}) {
     if (this.id && !(Account.user && Account.user.isAdmin)) gtag('event', name, params);
   },
-  page(hash) {
-    const path = '/' + (hash || '').replace(/^#\/?/, '');
+  page(path) {
     const params = { page_title: document.title, page_location: location.origin + path, page_path: path };
     if (this.first && document.referrer) params.page_referrer = document.referrer;
     this.first = false;
@@ -304,7 +303,7 @@ function customLessons(a) {
   }
   if (a.problemWords.length >= 3) {
     out.push({ id: 'words', title: 'המילים הבעייתיות שלך', keys: [], words: a.problemWords, target: base,
-      desc: 'מילים שבהן טעית לאחרונה. כל פעם שתקלידו מילה בלי טעות – היא יורדת מהרשימה.' });
+      desc: 'מילים שבהן טעית לאחרונה. כל פעם שתקלידו מילה בלי טעות, היא יורדת מהרשימה.' });
   }
   return out;
 }

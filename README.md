@@ -53,11 +53,22 @@ In Google Cloud Console → **Google Auth Platform**:
 - **Clients → your Web client → Authorized JavaScript origins**: `http://localhost`,
   `http://localhost:5000`, `https://hakladaivrit.com`, `https://www.hakladaivrit.com`.
 - **Branding**: home page `https://hakladaivrit.com`, privacy policy
-  `https://hakladaivrit.com/#/privacy`, authorized domain `hakladaivrit.com`.
+  `https://hakladaivrit.com/privacy`, authorized domain `hakladaivrit.com`.
 - **Audience**: **Publish app** (until then only listed test users can sign in).
 
 The worker verifies every Google token's signature, audience, expiry and verified email itself
 (`lib/google-auth.js`, tested by `npm test`).
+
+## Search engines
+
+Every page has its own address (`/test`, `/lessons`, `/lesson/1` … `/lesson/16`, `/practice`,
+`/privacy`); old `/#/…` links still work. The worker adds each page's title, description,
+canonical link and structured data (schema.org) to the HTML, and serves `/sitemap.xml` and
+`/robots.txt`. Private pages (`/profile`, `/admin`, `/custom/…`) are marked `noindex`.
+Lesson titles and descriptions are read from `public/js/data.js`.
+
+In Google Search Console, add the **Domain** property `hakladaivrit.com` (verify with the TXT
+record it gives you, in Cloudflare → DNS), then submit `https://hakladaivrit.com/sitemap.xml`.
 
 ## Visitor statistics (Google Analytics)
 
@@ -88,7 +99,7 @@ It shows registered users, sign-ups, active users per day, completed activities 
 
 ## Layout
 
-- `worker/index.js` – API, HTML page (security headers, AdSense), ads.txt, www redirect
+- `worker/index.js` – API, HTML pages (SEO tags, security headers, AdSense), sitemap, robots.txt, ads.txt, www redirect
 - `lib/google-auth.js` – Google token verification; `test/` – tests (`npm test`)
 - `migrations/` – database schema (applied by `npm run dev` / `npm run deploy`)
 - `wrangler.jsonc` – Cloudflare configuration and site settings

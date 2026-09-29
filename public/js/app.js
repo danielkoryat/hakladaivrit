@@ -22,13 +22,13 @@
   };
   const starsHtml = (n, cls = '') =>
     `<span class="stars ${cls}" aria-label="${n} כוכבים">${[1, 2, 3].map(i => `<span class="${i <= n ? 'on' : ''}">${ICON.star}</span>`).join('')}</span>`;
-  const touchNote = () => isTouch ? '<p class="touch-note">האתר מיועד להקלדה במקלדת פיזית – חברו מקלדת כדי לתרגל.</p>' : '';
+  const touchNote = () => isTouch ? '<p class="touch-note">האתר מיועד להקלדה במקלדת פיזית. חברו מקלדת כדי לתרגל.</p>' : '';
   const statBox = (label, value, big) => `<div class="stat${big ? ' big' : ''}"><div class="label">${label}</div><div class="value">${value}</div></div>`;
   const KIND_NAMES = { test: 'מבחן', lesson: 'שיעור', practice: 'תרגול', custom: 'שיעור אישי' };
 
   function missedHtml(charStats) {
     const missed = Object.entries(charStats).filter(([, s]) => s[1] > 0).sort((a, b) => b[1][1] - a[1][1]).slice(0, 8);
-    if (!missed.length) return `<div class="missed"><div class="missed-title">אף טעות – כל הכבוד!</div></div>`;
+    if (!missed.length) return `<div class="missed"><div class="missed-title">אף טעות, כל הכבוד!</div></div>`;
     return `<div class="missed"><div class="missed-title">מקשים שבהם טעיתם</div><div class="chips">${
       missed.map(([ch, s]) => `<span class="chip">${ch === ' ' ? 'רווח' : esc(ch)} <span class="num">×${s[1]}</span></span>`).join('')
     }</div></div>`;
@@ -258,11 +258,17 @@
     keyHandler(e);
   });
 
+  // Pages have real addresses (/test, /lesson/3 …) so search engines can index each one.
+  function navigate(path) {
+    if (path !== location.pathname) history.pushState(null, '', path);
+    route();
+  }
+
   function route() {
     if (cleanup) cleanup();
     cleanup = null;
     keyHandler = null;
-    const [page, arg] = location.hash.replace(/^#\/?/, '').split('/');
+    const [, page = '', arg] = location.pathname.replace(/\/+$/, '').split('/');
     const navKey = page === 'lesson' || page === 'custom' ? 'lessons' : page;
     $$('.nav a').forEach(a => a.classList.toggle('active', a.dataset.nav === navKey));
     if (page === 'test') viewTest();
@@ -276,9 +282,21 @@
     else viewHome();
     window.scrollTo(0, 0);
     Ads.fill();
-    Analytics.page(location.hash || '#/');
+    Analytics.page(location.pathname);
   }
-  window.addEventListener('hashchange', route);
+  window.addEventListener('popstate', route);
+  // Internal links switch pages without reloading.
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="/"]');
+    if (!a || a.target || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    navigate(a.getAttribute('href'));
+  });
+  // Old links such as /#/lesson/3 keep working.
+  function upgradeHashLink() {
+    if (location.hash.startsWith('#/')) history.replaceState(null, '', location.hash.slice(1) || '/');
+  }
+  window.addEventListener('hashchange', () => { upgradeHashLink(); route(); });
 
   // Keep Space / Enter from activating a focused button while typing.
   view.addEventListener('click', e => { const b = e.target.closest('button'); if (b) b.blur(); });
@@ -287,8 +305,8 @@
   function renderUserArea() {
     const el = $('#user-area');
     if (Account.user) {
-      el.innerHTML = (Account.user.isAdmin ? '<a class="user-chip admin" href="#/admin" title="לוח ניהול">ניהול</a>' : '') +
-        `<a class="user-chip" href="#/profile" title="הפרופיל שלי">${ICON.user}<span>${esc(displayName(Account.user))}</span></a>`;
+      el.innerHTML = (Account.user.isAdmin ? '<a class="user-chip admin" href="/admin" title="לוח ניהול">ניהול</a>' : '') +
+        `<a class="user-chip" href="/profile" title="הפרופיל שלי">${ICON.user}<span>${esc(displayName(Account.user))}</span></a>`;
     } else if (Account.online) {
       el.innerHTML = '<button class="btn small" id="login-btn">התחברות</button>';
       $('#login-btn').onclick = () => openAuth();
@@ -336,15 +354,15 @@
 
   // ---------- Home ----------
   function viewHome() {
-    document.title = 'הקלדה עיוורת בעברית – מבחן הקלדה, שיעורים ותרגול';
+    document.title = 'הקלדה עיוורת בעברית | מבחן הקלדה, שיעורים ותרגול';
     view.innerHTML = `
       <section class="hero">
         <h1>הקלדה <span>עיוורת</span> בעברית</h1>
-        <p class="lead">מבחן הקלדה חינמי, שיעורים מדורגים ותרגול חכם – ללמוד להקליד מהר ומדויק בעשר אצבעות, בלי להסתכל על המקלדת.</p>
+        <p class="lead">מבחן הקלדה חינמי, שיעורים מדורגים ותרגול חכם. ללמוד להקליד מהר ומדויק בעשר אצבעות, בלי להסתכל על המקלדת.</p>
         <div class="hero-actions">
-          <a class="btn primary" href="#/test">התחלת מבחן הקלדה</a>
-          <a class="btn" href="#/practice">התחלת תרגול</a>
-          <a class="btn ghost" href="#/lessons">שיעורי הקלדה</a>
+          <a class="btn primary" href="/test">התחלת מבחן הקלדה</a>
+          <a class="btn" href="/practice">התחלת תרגול</a>
+          <a class="btn ghost" href="/lessons">שיעורי הקלדה</a>
         </div>
         <div class="hero-kb" id="home-kb"></div>
         ${fingerLegend()}
@@ -352,9 +370,9 @@
       ${Ads.slot('home')}
 
       <article class="content">
-        <h2>הקלדה עיוורת – להקליד מהר בלי להסתכל על המקלדת</h2>
+        <h2>הקלדה עיוורת: להקליד מהר בלי להסתכל על המקלדת</h2>
         <p><strong>הקלדה עיוורת</strong>, שנקראת גם <strong>הקלדה בעשר אצבעות</strong>, היא שיטה שבה מקלידים בלי להסתכל על המקלדת. כל אצבע אחראית על קבוצת מקשים קבועה, ועם הזמן נבנה <strong>זיכרון שריר</strong> שמוצא כל אות לבד.</p>
-        <p>בין אם אתם סטודנטים, מתכנתים, כותבים או עובדי משרד – שליטה בהקלדה עיוורת <strong>משפרת משמעותית את המהירות ואת הדיוק</strong>.</p>
+        <p>בין אם אתם סטודנטים, מתכנתים, כותבים או עובדי משרד, שליטה בהקלדה עיוורת <strong>משפרת משמעותית את המהירות ואת הדיוק</strong>.</p>
 
         <h2>למה ללמוד הקלדה עיוורת?</h2>
         <ul>
@@ -362,26 +380,26 @@
           <li>להתרכז במחשבות ולא במקלדת</li>
           <li>לעבוד ביעילות ובפחות עייפות</li>
         </ul>
-        <p>בלי לחפש מקשים ובלי להעביר את המבט בין המסך למקלדת – רק הקלדה חלקה, מהירה ומדויקת.</p>
+        <p>בלי לחפש מקשים ובלי להעביר את המבט בין המסך למקלדת. רק הקלדה חלקה, מהירה ומדויקת.</p>
 
         <h2>יתרונות מרכזיים</h2>
         <div class="cards3">
-          <div class="card"><div class="card-icon">${ICON.zap}</div><h3>מהירות</h3><p>עם תרגול קבוע אפשר להגיע ל־200–400 תווים לדקה ויותר, ולסיים משימות מהר יותר.</p></div>
-          <div class="card"><div class="card-icon">${ICON.check}</div><h3>דיוק</h3><p>כשהאצבעות יודעות את הדרך – פחות טעויות ופחות זמן על תיקונים.</p></div>
+          <div class="card"><div class="card-icon">${ICON.zap}</div><h3>מהירות</h3><p>עם תרגול קבוע אפשר להגיע ל־200 עד 400 תווים לדקה ויותר, ולסיים משימות מהר יותר.</p></div>
+          <div class="card"><div class="card-icon">${ICON.check}</div><h3>דיוק</h3><p>כשהאצבעות יודעות את הדרך, יש פחות טעויות ופחות זמן על תיקונים.</p></div>
           <div class="card"><div class="card-icon">${ICON.heart}</div><h3>ארגונומיה</h3><p>יציבה נכונה ומבט קבוע במסך מפחיתים עומס על הצוואר, הגב והעיניים.</p></div>
         </div>
 
         <h2>שורת הבית: ש ד ג כ · ח ל ך ף</h2>
-        <p>האצבעות נחות תמיד על שורת הבית. ביד שמאל: זרת על <b>ש</b>, קמיצה על <b>ד</b>, אמה על <b>ג</b> ואצבע מורה על <b>כ</b>. ביד ימין: אצבע מורה על <b>ח</b>, אמה על <b>ל</b>, קמיצה על <b>ך</b> וזרת על <b>ף</b>. על המקשים כ ו־ח (F ו־J) יש בליטה קטנה – כך מוצאים את המקום בלי להסתכל. האגודלים אחראים על מקש הרווח.</p>
+        <p>האצבעות נחות תמיד על שורת הבית. ביד שמאל: זרת על <b>ש</b>, קמיצה על <b>ד</b>, אמה על <b>ג</b> ואצבע מורה על <b>כ</b>. ביד ימין: אצבע מורה על <b>ח</b>, אמה על <b>ל</b>, קמיצה על <b>ך</b> וזרת על <b>ף</b>. על המקשים כ ו־ח (F ו־J) יש בליטה קטנה, וכך מוצאים את המקום בלי להסתכל. האגודלים אחראים על מקש הרווח.</p>
 
         <h2>ידיים וירטואליות בזמן אמת</h2>
-        <p>בזמן ההקלדה מופיעה מתחת לטקסט מקלדת עם <strong>ידיים וירטואליות</strong>: האצבע שצריכה ללחוץ על המקש הבא נדלקת ונשלחת אליו, כך שתמיד ברור איזו אצבע עובדת – בלי להסתכל על הידיים האמיתיות.</p>
+        <p>בזמן ההקלדה מופיעה מתחת לטקסט מקלדת עם <strong>ידיים וירטואליות</strong>: האצבע שצריכה ללחוץ על המקש הבא נדלקת ונשלחת אליו, כך שתמיד ברור איזו אצבע עובדת, בלי להסתכל על הידיים האמיתיות.</p>
 
         <h2>מבחן הקלדה אונליין</h2>
         <ul>
-          <li><strong>זמן</strong> – מקלידים כמה שיותר במשך 15, 30, 60 או 120 שניות.</li>
-          <li><strong>מילים</strong> – מקלידים מספר קבוע של מילים: 10, 25, 50 או 100.</li>
-          <li><strong>ציטוט</strong> – מקלידים משפט מפורסם, כולל סימני פיסוק.</li>
+          <li><strong>זמן</strong>: מקלידים כמה שיותר במשך 15, 30, 60 או 120 שניות.</li>
+          <li><strong>מילים</strong>: מקלידים מספר קבוע של מילים: 10, 25, 50 או 100.</li>
+          <li><strong>ציטוט</strong>: מקלידים משפט מפורסם, כולל סימני פיסוק.</li>
         </ul>
         <p>בסיום מקבלים מילים לדקה (WPM), תווים לדקה (CPM), אחוז דיוק ורשימה של המקשים שבהם טעיתם.</p>
 
@@ -390,12 +408,12 @@
 
         ${Ads.slot('home')}
         <h2>שאלות נפוצות</h2>
-        <details><summary>כמה זמן לוקח ללמוד הקלדה עיוורת?</summary><p>רוב האנשים מכירים את כל המקשים אחרי שבוע–שבועיים של 15–20 דקות תרגול ביום. המהירות ממשיכה לעלות עם הזמן.</p></details>
-        <details><summary>צריך להחליף את שפת המקלדת לעברית?</summary><p>לא חובה. האתר מזהה את המיקום הפיזי של המקש, כך שגם כשהמחשב מוגדר לאנגלית – לחיצה על A תיחשב כ־ש.</p></details>
-        <details><summary>מה נחשב מהירות טובה?</summary><p>הקלדה ממוצעת היא בערך 35–40 מילים לדקה. 60 ומעלה נחשב מהיר, ו־80 ומעלה מצוין. בהתחלה חשוב יותר להקפיד על דיוק – המהירות תגיע.</p></details>
+        <details><summary>כמה זמן לוקח ללמוד הקלדה עיוורת?</summary><p>רוב האנשים מכירים את כל המקשים אחרי שבוע או שבועיים של 15 עד 20 דקות תרגול ביום. המהירות ממשיכה לעלות עם הזמן.</p></details>
+        <details><summary>צריך להחליף את שפת המקלדת לעברית?</summary><p>לא חובה. האתר מזהה את המיקום הפיזי של המקש, כך שגם כשהמחשב מוגדר לאנגלית, לחיצה על A תיחשב כ־ש.</p></details>
+        <details><summary>מה נחשב מהירות טובה?</summary><p>הקלדה ממוצעת היא בערך 35 עד 40 מילים לדקה. 60 ומעלה נחשב מהיר, ו־80 ומעלה מצוין. בהתחלה חשוב יותר להקפיד על דיוק, והמהירות תגיע.</p></details>
         <details><summary>צריך חשבון?</summary><p>לא. אפשר לתרגל כאורח, והנתונים יישמרו בדפדפן. עם חשבון, התוצאות נשמרות בשרת ואפשר להמשיך מכל מחשב.</p></details>
 
-        <div class="home-cta"><a class="btn primary" href="#/lessons">מתחילים מהשיעור הראשון</a></div>
+        <div class="home-cta"><a class="btn primary" href="/lessons">מתחילים מהשיעור הראשון</a></div>
       </article>`;
 
     // A little demo: the hands "type" a phrase on the home keyboard.
@@ -410,7 +428,7 @@
 
   // ---------- Test ----------
   function viewTest() {
-    document.title = 'מבחן הקלדה בעברית | הקלדה עיוורת';
+    document.title = 'מבחן הקלדה בעברית: בדקו את מהירות ההקלדה שלכם | הקלדה עיוורת';
     const cfg = Object.assign({ mode: 'time', time: 30, words: 25, punct: false, nums: false, kb: true }, Store.get('testCfg', {}));
     view.innerHTML = `
       <section class="page">
@@ -512,7 +530,7 @@
           ${statBox('מילים לדקה', Math.round(s.wpm), true)}
           ${statBox('דיוק', Math.round(s.acc) + '%', true)}
         </div>
-        ${lastQuote && cfg.mode === 'quote' ? `<p class="quote-src">— ${esc(lastQuote.source)}</p>` : ''}
+        ${lastQuote && cfg.mode === 'quote' ? `<p class="quote-src">${esc(lastQuote.source)}</p>` : ''}
         <div class="result-grid">
           ${statBox('תווים לדקה', Math.round(s.cpm))}
           ${statBox('זמן', fmtTime(s.secs))}
@@ -524,7 +542,7 @@
         <div class="actions">
           <button class="btn primary" id="again">${ICON.restart} מבחן חדש</button>
           <button class="btn" id="same">אותו טקסט שוב</button>
-          <a class="btn ghost" href="#/profile">לניתוח הביצועים שלי</a>
+          <a class="btn ghost" href="/profile">לניתוח הביצועים שלי</a>
         </div>
         ${Ads.slot('results')}`;
       Ads.fill(r);
@@ -545,7 +563,7 @@
 
   // ---------- Lessons list ----------
   function viewLessons() {
-    document.title = 'שיעורי הקלדה עיוורת בעברית | הקלדה עיוורת';
+    document.title = 'שיעורי הקלדה עיוורת בעברית: 16 שיעורים מדורגים | הקלדה עיוורת';
     const prog = Account.data.lessons;
     const done = LESSONS.filter(l => prog[l.id] && prog[l.id].stars).length;
     const pct = Math.round((done / LESSONS.length) * 100);
@@ -578,7 +596,7 @@
               const keys = l.newKeys.length
                 ? `<div class="lc-keys">${l.newKeys.map(k => `<span class="kc">${esc(k)}</span>`).join('')}</div>`
                 : `<div class="lc-type">${typeLabel[l.type] || typeLabel.review}</div>`;
-              return `<a class="lesson-card${p && p.stars ? ' done' : ''}" href="#/lesson/${l.id}">
+              return `<a class="lesson-card${p && p.stars ? ' done' : ''}" href="/lesson/${l.id}">
                 <div class="lc-top"><span class="lc-num">${String(l.id).padStart(2, '0')}</span>${starsHtml(p ? p.stars : 0)}</div>
                 <div class="lc-title">${esc(l.title)}</div>
                 ${keys}
@@ -594,7 +612,7 @@
     const keys = l.keys.length
       ? `<div class="lc-keys">${l.keys.slice(0, 10).map(k => `<span class="kc">${esc(k)}</span>`).join('')}</div>`
       : `<div class="lc-keys">${l.words.slice(0, 4).map(w => `<span class="kc">${esc(w)}</span>`).join('')}</div>`;
-    return `<a class="lesson-card custom" href="#/custom/${l.id}">
+    return `<a class="lesson-card custom" href="/custom/${l.id}">
       <div class="lc-top"><span class="lc-num">${ICON.sparkle}</span></div>
       <div class="lc-title">${esc(l.title)}</div>
       ${keys}
@@ -607,7 +625,7 @@
     view.innerHTML = `
       <section class="page">
         <div class="lesson-head">
-          <a class="back" href="#/lessons">→ כל השיעורים</a>
+          <a class="back" href="/lessons">→ כל השיעורים</a>
           <div class="lesson-meta">${meta}</div>
           <h1>${esc(title)}</h1>
           <p>${esc(desc)}</p>
@@ -663,13 +681,13 @@
       save(tp, stars);
       const note = stars === 3 ? 'מעולה! עברתם את השיעור בהצטיינות.'
         : stars === 2 ? `יפה מאוד. לשלושה כוכבים: דיוק של 97% ומעלה ולפחות ${target} מילים לדקה.`
-        : 'סיימתם את השיעור! נסו שוב והתמקדו בדיוק – לאט ובטוח.';
+        : 'סיימתם את השיעור! נסו שוב והתמקדו בדיוק, לאט ובטוח.';
       $('#stage').hidden = true;
       const r = $('#result');
       r.hidden = false;
       r.innerHTML = `
         ${starsHtml(stars, 'big')}
-        <h2 class="result-title">${esc(title)} – הושלם</h2>
+        <h2 class="result-title">הושלם: ${esc(title)}</h2>
         <p class="result-note">${note}</p>
         <div class="result-top">
           ${statBox('מילים לדקה', wpm, true)}
@@ -685,7 +703,7 @@
         <div class="actions">
           ${next ? `<a class="btn primary" href="${next.href}">${next.label} ${ICON.next}</a>` : ''}
           <button class="btn" id="again">${ICON.restart} שוב</button>
-          <a class="btn ghost" href="#/lessons">כל השיעורים</a>
+          <a class="btn ghost" href="/lessons">כל השיעורים</a>
         </div>
         ${Ads.slot('results')}`;
       Ads.fill(r);
@@ -695,7 +713,7 @@
     keyHandler = e => {
       if (e.key === 'Tab' || e.key === 'Escape') { e.preventDefault(); start(); return; }
       if (!$('#stage').hidden && typer) typer.handleKey(e);
-      else if (e.key === 'Enter' && next) location.hash = next.href;
+      else if (e.key === 'Enter' && next) navigate(next.href);
     };
     cleanup = () => typer && typer.destroy();
     start();
@@ -703,7 +721,7 @@
 
   function viewLesson(id) {
     const idx = LESSONS.findIndex(l => l.id === id);
-    if (idx < 0) { location.hash = '#/lessons'; return; }
+    if (idx < 0) { navigate('/lessons'); return; }
     const lesson = LESSONS[idx];
     const nextLesson = LESSONS[idx + 1];
     runLesson({
@@ -716,16 +734,16 @@
       makeText: () => lessonText(lesson, idx),
       target: lesson.target,
       save: (tp, stars) => Account.record(tp.report({ kind: 'lesson', mode: `lesson-${id}`, label: `שיעור ${id}`, lessonId: id, stars })),
-      next: nextLesson ? { href: `#/lesson/${nextLesson.id}`, label: 'לשיעור הבא' } : { href: '#/profile', label: 'לניתוח הביצועים' },
+      next: nextLesson ? { href: `/lesson/${nextLesson.id}`, label: 'לשיעור הבא' } : { href: '/profile', label: 'לניתוח הביצועים' },
     });
   }
 
   function viewCustom(id) {
     const lesson = customLessons(analyze(Account.data)).find(l => l.id === id);
-    if (!lesson) { location.hash = '#/profile'; return; }
+    if (!lesson) { navigate('/profile'); return; }
     runLesson({
       docTitle: `${lesson.title} | הקלדה עיוורת`,
-      meta: `${ICON.sparkle} שיעור מותאם אישית – נבנה מתוך הנתונים שלך`,
+      meta: `${ICON.sparkle} שיעור מותאם אישית שנבנה מתוך הנתונים שלך`,
       title: lesson.title,
       desc: lesson.desc,
       focusKeys: lesson.keys,
@@ -733,13 +751,13 @@
       makeText: () => customLessonText(lesson),
       target: lesson.target,
       save: tp => Account.record(tp.report({ kind: 'custom', mode: `custom-${id}`, label: lesson.title })),
-      next: { href: '#/profile', label: 'לניתוח המעודכן' },
+      next: { href: '/profile', label: 'לניתוח המעודכן' },
     });
   }
 
   // ---------- Practice ----------
   function viewPractice() {
-    document.title = 'תרגול הקלדה עיוורת | הקלדה עיוורת';
+    document.title = 'תרגול הקלדה בעברית שמתמקד במקשים החלשים שלכם | הקלדה עיוורת';
     const cfg = Object.assign({ mode: 'weak', noMistakes: true }, Store.get('practiceCfg', {}));
     const MODE_NAMES = { weak: 'מקשים חלשים', common: 'מילים נפוצות', sentences: 'משפטים' };
     view.innerHTML = `
@@ -758,7 +776,7 @@
         <h2 class="section-title">מפת הטעויות שלכם</h2>
         <div class="weak-row">
           <div id="weak"></div>
-          <div><a class="btn ghost" href="#/profile">לניתוח המלא</a><button class="btn ghost" id="reset-stats">איפוס נתונים</button></div>
+          <div><a class="btn ghost" href="/profile">לניתוח המלא</a><button class="btn ghost" id="reset-stats">איפוס נתונים</button></div>
         </div>
         <div class="kb-wrap" id="heat" style="margin-top:0"></div>
         <div class="legend"><span>מדויק</span><span class="heat-scale"></span><span>הרבה טעויות</span></div>
@@ -773,7 +791,7 @@
       const weak = weakLetters();
       $('#weak').innerHTML = weak.length
         ? `<span style="color:var(--c-sub-alt)">האותיות החלשות שלכם: </span><span class="chips" style="display:inline-flex">${weak.map(c => `<span class="chip">${esc(c)}</span>`).join('')}</span>`
-        : '<span style="color:var(--c-sub-alt)">עדיין אין מספיק נתונים. הקלידו קצת – והמפה תתמלא.</span>';
+        : '<span style="color:var(--c-sub-alt)">עדיין אין מספיק נתונים. הקלידו קצת והמפה תתמלא.</span>';
     }
 
     function renderConfig() {
@@ -826,7 +844,7 @@
     function start(text, keepRound) {
       if (!keepRound) { round = 1; banner(''); }
       if (!text && cfg.mode === 'weak' && !weakLetters().length) {
-        banner('עוד אין מספיק נתונים על המקשים החלשים שלכם – בינתיים מתרגלים מילים נפוצות.', true);
+        banner('עוד אין מספיק נתונים על המקשים החלשים שלכם, אז בינתיים מתרגלים מילים נפוצות.', true);
       }
       $('#result').hidden = true;
       $('#stage').hidden = false;
@@ -850,7 +868,7 @@
       if (cfg.noMistakes && s.errors > 0) {
         const missedWords = [...new Set(tp.errorWords())];
         round++;
-        banner(`סבב ${round - 1}: ${s.errors === 1 ? 'טעות אחת' : s.errors + ' טעויות'} (${Math.round(s.wpm)} מילים לדקה). המילים שבהן טעיתם חוזרות – ממשיכים עד סבב בלי אף טעות.`);
+        banner(`סבב ${round - 1}: ${s.errors === 1 ? 'טעות אחת' : s.errors + ' טעויות'} (${Math.round(s.wpm)} מילים לדקה). המילים שבהן טעיתם חוזרות. ממשיכים עד סבב בלי אף טעות.`);
         const next = cfg.mode === 'sentences'
           ? shuffle(SENTENCES).slice(0, 2).join(' ') + ' ' + missedWords.join(' ')
           : shuffle([...missedWords, ...missedWords, ...freshText(Math.max(8, 20 - missedWords.length * 2)).split(' ')]).join(' ');
@@ -874,7 +892,7 @@
           ${statBox('מילים', tp.wordCount)}
         </div>
         ${missedHtml(s.charStats)}
-        <div class="actions"><button class="btn primary" id="again">${ICON.restart} תרגול נוסף</button><a class="btn ghost" href="#/profile">לניתוח הביצועים</a></div>
+        <div class="actions"><button class="btn primary" id="again">${ICON.restart} תרגול נוסף</button><a class="btn ghost" href="/profile">לניתוח הביצועים</a></div>
         ${Ads.slot('results')}`;
       Ads.fill(r);
       $('#again').onclick = () => start();
@@ -984,7 +1002,7 @@
     }
     if (a.overall.acc != null && a.overall.total >= 100) {
       if (a.overall.acc >= 0.96) good.push(`דיוק כללי גבוה: ${pct(a.overall.acc)} מכל ההקשות.`);
-      else bad.push(`הדיוק הכללי שלך ${pct(a.overall.acc)}. נסו להאט מעט – דיוק קודם למהירות.`);
+      else bad.push(`הדיוק הכללי שלך ${pct(a.overall.acc)}. נסו להאט מעט, כי דיוק קודם למהירות.`);
     }
     if (a.strongestFinger) good.push(`האצבע החזקה שלך: ${a.strongestFinger.name} (${pct(a.strongestFinger.acc)} דיוק).`);
     if (a.strongKeys.length) good.push(`המקשים המדויקים והמהירים שלך: ${a.strongKeys.map(k => k.ch).join(' ')}.`);
@@ -992,7 +1010,7 @@
     if (doneLessons) good.push(`השלמת ${doneLessons} מתוך ${LESSONS.length} שיעורים.`);
 
     if (a.weakKeys.length) bad.push(`דיוק נמוך במקשים: ${a.weakKeys.map(k => `${k.ch} (${pct(k.acc)})`).join(', ')}.`);
-    if (a.slowKeys.length) bad.push(`מקשים איטיים: ${a.slowKeys.map(k => `${k.ch} (${Math.round(k.ms)}ms)`).join(', ')} – לעומת ממוצע של ${Math.round(a.overall.ms)}ms.`);
+    if (a.slowKeys.length) bad.push(`מקשים איטיים: ${a.slowKeys.map(k => `${k.ch} (${Math.round(k.ms)}ms)`).join(', ')}, לעומת ממוצע של ${Math.round(a.overall.ms)}ms.`);
     if (a.weakestFinger) bad.push(`האצבע החלשה ביותר: ${a.weakestFinger.name} (${pct(a.weakestFinger.acc)} דיוק).`);
     if (a.weakestRow) bad.push(`השורה החלשה ביותר: ${a.weakestRow.name} (${pct(a.weakestRow.acc)} דיוק).`);
     if (a.problemWords.length) bad.push(`מילים שחוזרות על טעויות: ${a.problemWords.slice(0, 6).join(', ')}.`);
@@ -1020,7 +1038,7 @@
           <div>
             <h1>${user ? esc(displayName(user)) : 'הפרופיל שלי'}</h1>
             <p>${user ? `<span class="num">${esc(user.email)}</span> · ההתקדמות שלך נשמרת בחשבון ומסונכרנת בין מכשירים.`
-              : 'את/ה מתרגל/ת כאורח – הנתונים נשמרים רק בדפדפן הזה.'}</p>
+              : 'את/ה מתרגל/ת כאורח, והנתונים נשמרים רק בדפדפן הזה.'}</p>
           </div>
           <div class="profile-actions">
             ${user ? '<button class="btn ghost" id="logout">התנתקות</button>'
@@ -1032,14 +1050,14 @@
         ${!d.history.length ? `
           <div class="panel empty">
             <h2>עוד אין נתונים</h2>
-            <p>עשו מבחן הקלדה או שיעור ראשון – והניתוח האישי שלכם יופיע כאן.</p>
-            <div class="actions"><a class="btn primary" href="#/test">למבחן הקלדה</a><a class="btn" href="#/lesson/1">לשיעור הראשון</a></div>
+            <p>עשו מבחן הקלדה או שיעור ראשון, והניתוח האישי שלכם יופיע כאן.</p>
+            <div class="actions"><a class="btn primary" href="/test">למבחן הקלדה</a><a class="btn" href="/lesson/1">לשיעור הראשון</a></div>
           </div>` : `
         <div class="tiles">
-          ${tile('מהירות שיא', a.trend.best ? Math.round(a.trend.best) : '—', 'מילים לדקה במבחן')}
-          ${tile('ממוצע 10 מבחנים', a.trend.recentWpm != null ? Math.round(a.trend.recentWpm) : '—',
+          ${tile('מהירות שיא', a.trend.best ? Math.round(a.trend.best) : '-', 'מילים לדקה במבחן')}
+          ${tile('ממוצע 10 מבחנים', a.trend.recentWpm != null ? Math.round(a.trend.recentWpm) : '-',
             delta != null ? `<span class="${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta)}</span> לעומת 10 הקודמים` : 'מילים לדקה')}
-          ${tile('דיוק ממוצע', recent.length ? Math.round(avgOf(recent, 'acc')) + '%' : a.overall.acc != null ? Math.round(a.overall.acc * 100) + '%' : '—', recent.length ? '10 מבחנים אחרונים' : 'כל ההקשות')}
+          ${tile('דיוק ממוצע', recent.length ? Math.round(avgOf(recent, 'acc')) + '%' : a.overall.acc != null ? Math.round(a.overall.acc * 100) + '%' : '-', recent.length ? '10 מבחנים אחרונים' : 'כל ההקשות')}
           ${tile('זמן הקלדה', fmtTime(d.totals.secs || 0), `${d.totals.count || d.history.length} אימונים`)}
           ${tile('שיעורים', `${lessonsDone}/${LESSONS.length}`, 'הושלמו')}
         </div>
@@ -1053,12 +1071,12 @@
         <div class="two-col">
           <div class="panel">
             <h2>חוזקות</h2>
-            ${good.length ? `<ul class="insights good">${good.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : '<p class="muted">המשיכו להתאמן – החוזקות יופיעו כאן.</p>'}
+            ${good.length ? `<ul class="insights good">${good.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : '<p class="muted">המשיכו להתאמן, והחוזקות יופיעו כאן.</p>'}
           </div>
           <div class="panel">
             <h2>לשיפור</h2>
             ${bad.length ? `<ul class="insights bad">${bad.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`
-              : `<p class="muted">${a.enough ? 'אין חולשות בולטות – כל הכבוד!' : 'צריך עוד קצת נתונים (לפחות 150 הקשות) כדי לזהות חולשות.'}</p>`}
+              : `<p class="muted">${a.enough ? 'אין חולשות בולטות, כל הכבוד!' : 'צריך עוד קצת נתונים (לפחות 150 הקשות) כדי לזהות חולשות.'}</p>`}
           </div>
         </div>
 
@@ -1066,7 +1084,7 @@
         ${custom.length ? `<div class="lesson-grid">${custom.map(customCard).join('')}</div>`
           : `<p class="muted">${a.enough ? 'לא נמצאו חולשות משמעותיות. נסו מבחן ארוך יותר כדי לאתגר את עצמכם.' : 'השיעורים האישיים ייבנו אחרי שנאסוף מספיק נתונים. המשיכו לתרגל!'}</p>`}
 
-        <h2 class="section-title">מפת דיוק – מקשים ואצבעות</h2>
+        <h2 class="section-title">מפת דיוק: מקשים ואצבעות</h2>
         <div class="kb-wrap" id="pkb" style="margin-top:0"></div>
         <div class="legend"><span>מדויק</span><span class="heat-scale"></span><span>הרבה טעויות</span></div>
 
@@ -1075,14 +1093,14 @@
             <h2>לפי אצבע</h2>
             <table class="table">
               <thead><tr><th>אצבע</th><th>דיוק</th><th>זמן להקשה</th><th>הקשות</th></tr></thead>
-              <tbody>${a.fingers.map(f => `<tr><td>${f.name}</td><td class="num">${f.acc != null ? Math.round(f.acc * 100) + '%' : '—'}</td><td class="num">${f.ms ? Math.round(f.ms) + 'ms' : '—'}</td><td class="num">${f.total}</td></tr>`).join('')}</tbody>
+              <tbody>${a.fingers.map(f => `<tr><td>${f.name}</td><td class="num">${f.acc != null ? Math.round(f.acc * 100) + '%' : '-'}</td><td class="num">${f.ms ? Math.round(f.ms) + 'ms' : '-'}</td><td class="num">${f.total}</td></tr>`).join('')}</tbody>
             </table>
           </div>
           <div class="panel">
             <h2>לפי שורה</h2>
             <table class="table">
               <thead><tr><th>שורה</th><th>דיוק</th><th>זמן להקשה</th><th>הקשות</th></tr></thead>
-              <tbody>${a.rows.map(r => `<tr><td>${r.name}</td><td class="num">${r.acc != null ? Math.round(r.acc * 100) + '%' : '—'}</td><td class="num">${r.ms ? Math.round(r.ms) + 'ms' : '—'}</td><td class="num">${r.total}</td></tr>`).join('')}</tbody>
+              <tbody>${a.rows.map(r => `<tr><td>${r.name}</td><td class="num">${r.acc != null ? Math.round(r.acc * 100) + '%' : '-'}</td><td class="num">${r.ms ? Math.round(r.ms) + 'ms' : '-'}</td><td class="num">${r.total}</td></tr>`).join('')}</tbody>
             </table>
           </div>
         </div>
@@ -1209,7 +1227,7 @@
         <div class="panel">
           <h2>משתמשים אחרונים שנרשמו</h2>
           ${table(['משתמש', 'נרשם', 'אימונים', 'שיא (מילים לדקה)', 'פעילות אחרונה'], s.recentUsers.map(u => [
-            `${u.name ? esc(u.name) + '<br>' : ''}<span class="num muted">${esc(u.email)}</span>`, fmtDate(u.createdAt), n(u.results), u.bestWpm != null ? n(u.bestWpm) : '—', u.lastActive ? fmtDate(u.lastActive) : '—',
+            `${u.name ? esc(u.name) + '<br>' : ''}<span class="num muted">${esc(u.email)}</span>`, fmtDate(u.createdAt), n(u.results), u.bestWpm != null ? n(u.bestWpm) : '-', u.lastActive ? fmtDate(u.lastActive) : '-',
           ]), 'עדיין אין משתמשים רשומים')}
         </div>`;
 
@@ -1237,9 +1255,9 @@
 
         <h2>איזה מידע נאסף</h2>
         <ul>
-          <li><strong>חשבון משתמש</strong> – ההתחברות נעשית עם Google. אנו מקבלים מ־Google את כתובת האימייל, השם ומזהה החשבון בלבד – לא את הסיסמה שלכם.</li>
-          <li><strong>תוצאות ותרגול</strong> – מהירות, דיוק, זמני הקשה לכל מקש ומילים שבהן טעיתם, כדי להציג לכם ניתוח ולבנות שיעורים מותאמים אישית. אורחים: הנתונים נשמרים רק בדפדפן שלכם.</li>
-          <li><strong>סטטיסטיקות שימוש</strong> – אנו משתמשים ב־Google Analytics כדי להבין כמה אנשים מבקרים באתר, אילו דפים נצפים ומאיפה מגיעים. Google Analytics משתמש בקובצי Cookie ואוסף מידע כמו סוג המכשיר, הדפדפן, מיקום משוער וכתובת ה־IP (מקוצרת). אפשר לקרוא על <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">האופן שבו Google משתמשת במידע</a> ולהתקין את <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">תוסף הביטול של Google Analytics</a>. אם הפעלתם בדפדפן Global Privacy Control – Google Analytics לא ייטען.</li>
+          <li><strong>חשבון משתמש</strong>: ההתחברות נעשית עם Google. אנו מקבלים מ־Google את כתובת האימייל, השם ומזהה החשבון בלבד, לא את הסיסמה שלכם.</li>
+          <li><strong>תוצאות ותרגול</strong>: מהירות, דיוק, זמני הקשה לכל מקש ומילים שבהן טעיתם, כדי להציג לכם ניתוח ולבנות שיעורים מותאמים אישית. אורחים: הנתונים נשמרים רק בדפדפן שלכם.</li>
+          <li><strong>סטטיסטיקות שימוש</strong>: אנו משתמשים ב־Google Analytics כדי להבין כמה אנשים מבקרים באתר, אילו דפים נצפים ומאיפה מגיעים. Google Analytics משתמש בקובצי Cookie ואוסף מידע כמו סוג המכשיר, הדפדפן, מיקום משוער וכתובת ה־IP (מקוצרת). אפשר לקרוא על <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">האופן שבו Google משתמשת במידע</a> ולהתקין את <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">תוסף הביטול של Google Analytics</a>. אם הפעלתם בדפדפן Global Privacy Control, Google Analytics לא ייטען.</li>
         </ul>
 
         <h2>פרסומות</h2>
@@ -1262,6 +1280,7 @@
     $('meta[name="theme-color"]').content = next === 'light' ? '#e9e9e9' : '#22272e';
   });
 
+  upgradeHashLink();
   Account.init().finally(() => {
     Analytics.init(Account.config.gaId);
     route();

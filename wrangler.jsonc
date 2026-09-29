@@ -9,7 +9,12 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*", "/", "/ads.txt"]
+    "run_worker_first": [
+      "/api/*", "/", "/ads.txt", "/robots.txt", "/sitemap.xml",
+      "/test", "/lessons", "/lesson/*", "/practice", "/profile", "/admin", "/privacy", "/custom/*",
+      "/test/", "/lessons/", "/practice/", "/profile/", "/admin/", "/privacy/"
+    ],
+    "not_found_handling": "404-page"
   },
 
   // Accounts, scores and statistics. Create it once with:  npx wrangler d1 create hakladaivrit
