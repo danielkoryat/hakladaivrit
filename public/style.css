@@ -95,7 +95,7 @@ kbd {
   color: var(--c-text);
   text-decoration: none !important;
 }
-.logo svg { width: 34px; height: 34px; color: var(--c-primary); }
+.logo img { width: 36px; height: 36px; display: block; }
 .logo-text { font-size: 1.5rem; font-weight: 700; letter-spacing: -.01em; }
 .logo-text span { color: var(--c-sub-alt); margin-inline-start: .3rem; font-weight: 500; }
 .nav { display: flex; gap: .25rem; margin-inline-start: auto; }
