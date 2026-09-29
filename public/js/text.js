@@ -21,11 +21,15 @@ function pseudoWord(letters, focus, len) {
   return w.join('');
 }
 
-function randomWords(n, { punct = false, nums = false } = {}) {
+// Simple, short words for kids mode.
+const KID_WORDS = WORDS.filter(w => [...w].length <= 4);
+
+function randomWords(n, { punct = false, nums = false, kids = false } = {}) {
   const out = [];
+  const pool = kids ? KID_WORDS : WORDS;
   for (let i = 0; i < n; i++) {
     let w;
-    do { w = pick(WORDS); } while (out.length && w === out[out.length - 1]);
+    do { w = pick(pool); } while (out.length && w === out[out.length - 1]);
     if (nums && Math.random() < 0.12) {
       w = String(rand(Math.random() < 0.5 ? 100 : 2100));
     } else if (punct) {

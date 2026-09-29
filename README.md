@@ -1,8 +1,10 @@
 # הקלדה עיוורת בעברית
 
-Hebrew touch-typing site: typing test, graded lessons, adaptive practice, animated
-on-screen hands, "Sign in with Google" accounts, personalised lessons, Google Analytics
-and Google AdSense support. Runs free on **Cloudflare Workers** with a **D1** database.
+Hebrew touch-typing site for kids and adults: typing test, 16 graded lessons, adaptive practice,
+a balloon typing game, a library of educational texts, practice on your own text, XP / levels /
+streaks / badges, a leaderboard, shareable result cards, animated on-screen hands, kids mode,
+light and dark themes, Google sign-in, Google Analytics and AdSense support.
+Runs free on **Cloudflare Workers** with a **D1** database.
 
 ## Run locally
 
@@ -117,5 +119,12 @@ It shows registered users, sign-ups, active users per day, completed activities 
   - `js/keyboard.js` – on-screen keyboard and animated hands
   - `js/text.js` – exercise text generation
   - `js/account.js` – sign-in, profile data, Google Analytics, ads, analysis, personalised lessons
-  - `js/app.js` – typing engine, pages and routing
+  - `js/core.js` – shared page context, preferences (hands, kids mode), icons, typing engine
+  - `js/gamify.js` – XP, levels, streaks, daily goal, badges, celebrations
+  - `js/share.js` – result card image, share window, challenge links
+  - `js/game.js` – balloon typing game
+  - `js/texts.js` – text library and "my text" practice
+  - `js/leaderboard.js` – leaderboard page
+  - `js/app.js` – router, header and the other pages
+  - `data/texts.json` – the educational texts (typeable characters only)
   - `content/*.html` – page texts (home, guide, and explanations for the test, lessons and practice pages)

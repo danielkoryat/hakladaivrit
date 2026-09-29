@@ -12,7 +12,8 @@
     "run_worker_first": [
       "/api/*", "/", "/ads.txt", "/robots.txt", "/sitemap.xml", "/llms.txt",
       "/test", "/lessons", "/lesson/*", "/practice", "/guide", "/profile", "/admin", "/privacy", "/custom/*",
-      "/test/", "/lessons/", "/practice/", "/guide/", "/profile/", "/admin/", "/privacy/"
+      "/game", "/leaderboard", "/texts", "/texts/*",
+      "/test/", "/lessons/", "/practice/", "/guide/", "/profile/", "/admin/", "/privacy/", "/game/", "/leaderboard/"
     ],
     "not_found_handling": "404-page"
   },

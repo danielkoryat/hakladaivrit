@@ -17,7 +17,7 @@ const Api = {
 
 // ---------- Profile data (server when logged in, browser storage for guests) ----------
 // keyStats: { char: [hits, misses, totalMs, timedCount] }
-const emptyProfile = () => ({ keyStats: {}, wordErrors: {}, lessons: {}, pbs: {}, history: [], totals: { count: 0, secs: 0 } });
+const emptyProfile = () => ({ keyStats: {}, wordErrors: {}, lessons: {}, pbs: {}, history: [], totals: { count: 0, secs: 0 }, game: {} });
 
 function loadLocalProfile() {
   let p = Store.get('profile', null);
@@ -30,7 +30,7 @@ function loadLocalProfile() {
   }
   return Object.assign(emptyProfile(), p);
 }
-const hasLocalProgress = p => p.history.length || Object.keys(p.keyStats).length || Object.keys(p.lessons).length;
+const hasLocalProgress = p => p.history.length || Object.keys(p.keyStats).length || Object.keys(p.lessons).length || (p.game && p.game.xp > 0);
 const normWord = w => w.replace(/[.,?!:;"'\-]/g, '');
 
 const Account = {
@@ -48,7 +48,7 @@ const Account = {
       this.config = config;
     } catch { this.online = false; }
     if (this.user) {
-      try { this.data = await Api.req('GET', '/profile'); } catch { this.data = emptyProfile(); }
+      try { this.data = fromServer(await Api.req('GET', '/profile')); } catch { this.data = emptyProfile(); }
     } else {
       this.data = loadLocalProfile();
     }
@@ -87,14 +87,45 @@ const Account = {
     d.totals.count++;
     d.totals.secs += entry.secs;
     Analytics.finish(r.kind, r.wpm, r.acc);
+    const reward = Gamify.award(d, r);
 
     if (this.user) {
       Api.req('POST', '/results', { ...entry, keyStats: r.keyStats, missedWords: missed, cleanWords: clean })
         .catch(() => toast('לא הצלחנו לשמור את התוצאה בשרת', true));
+      this.saveGame();
     } else {
       Store.set('profile', d);
     }
-    return { isPb };
+    return { isPb, reward };
+  },
+
+  // A finished round of the balloon game: XP, badges and (for accounts) the leaderboard.
+  recordGame({ mode, score, level }) {
+    const d = this.data;
+    const prevBest = Gamify.state(d).best[mode] || 0;
+    const reward = Gamify.award(d, { kind: 'game', mode, score, secs: 0, wpm: 0 });
+    Analytics.event('game_over', { mode, score });
+    if (this.user) {
+      Api.req('POST', '/game', { mode, score, level }).catch(() => {});
+      this.saveGame();
+    } else {
+      Store.set('profile', d);
+    }
+    return { reward, isBest: score > prevBest };
+  },
+
+  // Game state for accounts is saved a moment after the last change.
+  saveGame() {
+    clearTimeout(this._gameTimer);
+    this._gameTimer = setTimeout(() => {
+      Api.req('POST', '/state', { game: this.data.game }).catch(() => {});
+    }, 800);
+  },
+
+  async saveBoardSettings(settings) {
+    const r = await Api.req('POST', '/state', settings);
+    this.board = { nickname: r.nickname || '', showOnBoard: r.showOnBoard };
+    return this.board;
   },
 
   async googleAuth(credential) {
@@ -108,11 +139,15 @@ const Account = {
     this.user = user;
     const local = loadLocalProfile();
     if (hasLocalProgress(local)) {
-      this.data = await Api.req('POST', '/import', local);
+      this.data = fromServer(await Api.req('POST', '/import', local));
+      if (local.game && local.game.xp > 0) {
+        this.data.game = Gamify.merge(this.data.game, local.game);
+        await Api.req('POST', '/state', { game: this.data.game }).catch(() => {});
+      }
       ['profile', 'keyStats', 'lessons', 'pb'].forEach(k => Store.remove(k));
       toast('ההתקדמות מהדפדפן נשמרה בחשבון שלך');
     } else {
-      this.data = await Api.req('GET', '/profile');
+      this.data = fromServer(await Api.req('GET', '/profile'));
     }
     this.emit();
   },
@@ -134,6 +169,13 @@ const Account = {
 };
 
 const displayName = u => (u.name || u.email.split('@')[0]).slice(0, 40);
+
+// The server keeps game progress and leaderboard settings next to the typing data.
+function fromServer(p) {
+  const state = p.state || {};
+  Account.board = { nickname: state.nickname || '', showOnBoard: state.showOnBoard !== false };
+  return Object.assign(emptyProfile(), p, { game: state.game || {} });
+}
 
 // ---------- Sign in with Google (Google Identity Services) ----------
 const GoogleSignIn = {

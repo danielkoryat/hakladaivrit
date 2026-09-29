@@ -10,7 +10,8 @@ import { verifyGoogleIdToken, GoogleAuthError } from '../lib/google-auth.js';
 
 const SESSION_DAYS = 30;
 const MAX_BODY = 512 * 1024;
-const KINDS = new Set(['test', 'lesson', 'practice', 'custom']);
+const KINDS = new Set(['test', 'lesson', 'practice', 'custom', 'text']);
+const GAME_MODES = new Set(['home', 'letters', 'words']);
 
 // ---------- Settings (wrangler.jsonc "vars", or .dev.vars locally) ----------
 function settings(env) {
@@ -138,7 +139,7 @@ const SQL = {
 };
 
 async function profile(env, user, cfg) {
-  const [keys, words, lessons, pbs, history, totals] = await env.DB.batch([
+  const [keys, words, lessons, pbs, history, totals, state] = await env.DB.batch([
     env.DB.prepare('SELECT ch, hits, misses, time_ms, timed FROM key_stats WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('SELECT word, count FROM word_errors WHERE user_id = ?1 ORDER BY count DESC LIMIT 200').bind(user.id),
     env.DB.prepare('SELECT lesson_id, stars, wpm, acc FROM lessons WHERE user_id = ?1').bind(user.id),
@@ -146,7 +147,11 @@ async function profile(env, user, cfg) {
     env.DB.prepare(`SELECT at, kind, mode, label, wpm, acc, cpm, secs, errors, chars, lesson_id, stars
                     FROM results WHERE user_id = ?1 ORDER BY at DESC LIMIT 300`).bind(user.id),
     env.DB.prepare('SELECT COUNT(*) AS count, COALESCE(SUM(secs), 0) AS secs FROM results WHERE user_id = ?1').bind(user.id),
+    env.DB.prepare('SELECT data, nickname, show_on_board FROM user_state WHERE user_id = ?1').bind(user.id),
   ]);
+  const st = state.results[0];
+  let game = {};
+  try { game = st ? JSON.parse(st.data) : {}; } catch { game = {}; }
   const keyStats = {}, wordErrors = {}, lessonMap = {}, pbMap = {};
   keys.results.forEach(r => { keyStats[r.ch] = [r.hits, r.misses, r.time_ms, r.timed]; });
   words.results.forEach(r => { wordErrors[r.word] = r.count; });
@@ -159,7 +164,77 @@ async function profile(env, user, cfg) {
       errors: r.errors, chars: r.chars, lessonId: r.lesson_id, stars: r.stars,
     })),
     totals: { count: totals.results[0].count, secs: totals.results[0].secs },
+    state: { game, nickname: st ? st.nickname || '' : '', showOnBoard: st ? st.show_on_board === 1 : true },
   };
+}
+
+// ---------- Game progress & leaderboard ----------
+const NICK_RE = /^[\p{L}\p{N} ._'״׳-]{2,20}$/u;
+
+// Keeps only the known shape of the game state, with sane bounds.
+function cleanGame(g) {
+  if (!g || typeof g !== 'object') return null;
+  const obj = (o, max, keyOk, val) => {
+    const out = {};
+    if (!o || typeof o !== 'object') return out;
+    Object.entries(o).slice(0, max).forEach(([k, v]) => { if (keyOk(k)) { const c = val(v); if (c != null) out[k] = c; } });
+    return out;
+  };
+  return {
+    xp: int(g.xp, 0, 1e7),
+    chars: int(g.chars, 0, 1e9),
+    bestStreak: int(g.bestStreak, 0, 3650),
+    days: obj(g.days, 150, k => /^\d{4}-\d{2}-\d{2}$/.test(k), v => (v && typeof v === 'object' ? { xp: int(v.xp, 0, 1e5), n: int(v.n, 0, 1e4) } : null)),
+    badges: obj(g.badges, 60, k => /^[\w-]{1,30}$/.test(k), v => int(v, 0, 1e14)),
+    best: obj(g.best, 10, k => GAME_MODES.has(k), v => int(v, 0, 1e6)),
+    texts: obj(g.texts, 300, k => /^[\w-]{1,60}$/.test(k), v => int(v, 0, 400)),
+  };
+}
+
+// First name and the first letter of the family name, unless the user picked a nickname.
+function boardName(row) {
+  if (row.nickname) return row.nickname;
+  const parts = String(row.name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'משתמש אנונימי';
+  return parts.length > 1 ? `${parts[0]} ${[...parts[parts.length - 1]][0]}.` : parts[0];
+}
+
+// Practice bots keep the board lively and give everyone a target. They are always labelled as bots.
+const BOTS = [
+  { name: 'בוט צב', emoji: '🐢', speed: 18, game: 240, xp: 350 },
+  { name: 'בוט ארנב', emoji: '🐇', speed: 30, game: 520, xp: 950 },
+  { name: 'בוט שועל', emoji: '🦊', speed: 42, game: 860, xp: 2200 },
+  { name: 'בוט צ׳יטה', emoji: '🐆', speed: 58, game: 1300, xp: 4300 },
+  { name: 'בוט נשר', emoji: '🦅', speed: 72, game: 1900, xp: 7600 },
+  { name: 'בוט טיל', emoji: '🚀', speed: 90, game: 2700, xp: 12500 },
+];
+
+async function leaderboard(env, board, me) {
+  const week = Date.now() - 7 * 86400000;
+  const cols = 'u.name AS name, s.nickname AS nickname, COALESCE(s.xp, 0) AS xp';
+  let sql, bind = [];
+  if (board === 'game') {
+    sql = `SELECT g.user_id AS uid, MAX(g.score) AS value, ${cols} FROM game_scores g JOIN users u ON u.id = g.user_id
+           LEFT JOIN user_state s ON s.user_id = g.user_id
+           WHERE g.at >= ?1 AND COALESCE(s.show_on_board, 1) = 1 GROUP BY g.user_id ORDER BY value DESC LIMIT 25`;
+    bind = [week];
+  } else if (board === 'xp') {
+    sql = `SELECT s.user_id AS uid, s.xp AS value, ${cols} FROM user_state s JOIN users u ON u.id = s.user_id
+           WHERE s.show_on_board = 1 AND s.xp > 0 ORDER BY s.xp DESC LIMIT 25`;
+  } else {
+    sql = `SELECT r.user_id AS uid, ROUND(MAX(r.wpm)) AS value, ${cols} FROM results r JOIN users u ON u.id = r.user_id
+           LEFT JOIN user_state s ON s.user_id = r.user_id
+           WHERE r.kind = 'test' AND r.chars >= 50 AND r.acc >= 90 AND r.at >= ?1 AND COALESCE(s.show_on_board, 1) = 1
+           GROUP BY r.user_id ORDER BY value DESC LIMIT 25`;
+    bind = [board === 'all' ? 0 : week];
+  }
+  const rows = (await env.DB.prepare(sql).bind(...bind).all()).results.map(r => ({
+    name: boardName(r), value: r.value, xp: r.xp, isMe: !!me && r.uid === me.id,
+  }));
+  const key = board === 'game' ? 'game' : board === 'xp' ? 'xp' : 'speed';
+  BOTS.forEach(b => rows.push({ name: b.name, emoji: b.emoji, value: b[key], xp: b.xp, isBot: true }));
+  rows.sort((a, b) => b.value - a.value || (a.isBot ? 1 : -1));
+  return { board, rows: rows.slice(0, 30) };
 }
 
 // ---------- Admin statistics (accounts & activity; visitor stats live in Google Analytics) ----------
@@ -272,6 +347,11 @@ async function api(request, env, route, cfg) {
     return json(200, { ok: true }, { 'Set-Cookie': sessionCookie(request, '', 0) });
   }
 
+  if (route === '/leaderboard' && method === 'GET') {
+    const board = ['week', 'all', 'game', 'xp'].includes(url.searchParams.get('board')) ? url.searchParams.get('board') : 'week';
+    return json(200, await leaderboard(env, board, await currentUser(request, env)));
+  }
+
   const user = await currentUser(request, env);
   if (!user) return json(401, { error: 'יש להתחבר' });
 
@@ -327,6 +407,37 @@ async function api(request, env, route, cfg) {
     return json(200, await profile(env, user, cfg));
   }
 
+  if (route === '/state' && method === 'POST') {
+    const body = await readJson(request);
+    const cur = await env.DB.prepare('SELECT data, nickname, show_on_board FROM user_state WHERE user_id = ?1').bind(user.id).first();
+    let game = cur ? JSON.parse(cur.data || '{}') : {};
+    if (body.game !== undefined) {
+      const g = cleanGame(body.game);
+      if (!g) return json(400, { error: 'נתוני משחק לא תקינים' });
+      game = g;
+    }
+    let nickname = cur ? cur.nickname : null;
+    if (body.nickname !== undefined) {
+      const n = str(body.nickname, 40).trim();
+      if (n && !NICK_RE.test(n)) return json(400, { error: 'כינוי: 2 עד 20 אותיות, ספרות או רווחים.' });
+      nickname = n || null;
+    }
+    const show = body.showOnBoard !== undefined ? (body.showOnBoard ? 1 : 0) : (cur ? cur.show_on_board : 1);
+    await env.DB.prepare(`INSERT INTO user_state (user_id, data, xp, nickname, show_on_board, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                          ON CONFLICT (user_id) DO UPDATE SET data = excluded.data, xp = excluded.xp, nickname = excluded.nickname,
+                          show_on_board = excluded.show_on_board, updated_at = excluded.updated_at`)
+      .bind(user.id, JSON.stringify(game), int(game.xp, 0, 1e7), nickname, show, Date.now()).run();
+    return json(200, { ok: true, nickname: nickname || '', showOnBoard: show === 1 });
+  }
+
+  if (route === '/game' && method === 'POST') {
+    const body = await readJson(request);
+    if (!GAME_MODES.has(body.mode)) return json(400, { error: 'משחק לא תקין' });
+    await env.DB.prepare('INSERT INTO game_scores (user_id, at, mode, score) VALUES (?1, ?2, ?3, ?4)')
+      .bind(user.id, Date.now(), body.mode, int(body.score, 0, 100000)).run();
+    return json(201, { ok: true });
+  }
+
   if (route === '/stats/reset' && method === 'POST') {
     await env.DB.batch([
       env.DB.prepare('DELETE FROM key_stats WHERE user_id = ?1').bind(user.id),
@@ -357,6 +468,13 @@ const PAGES = {
     desc: 'למדו הקלדה עיוורת בעברית צעד אחר צעד: שורת הבית, השורה העליונה והתחתונה, פיסוק ומספרים, עם ידיים וירטואליות שמראות איזו אצבע ללחוץ.' },
   '/practice': { title: 'תרגול הקלדה בעברית שמתמקד במקשים החלשים שלכם | הקלדה עיוורת', priority: '0.8', crumb: 'תרגול', info: 'practice',
     desc: 'תרגול הקלדה חכם בעברית: האתר מזהה את המקשים והמילים שבהם אתם טועים ובונה תרגילים שמחזקים בדיוק אותם.' },
+  '/game': { title: 'משחק הקלדה לילדים: פוצצו את הבלונים | הקלדה עיוורת', priority: '0.9', crumb: 'משחק הבלונים', info: 'game',
+    desc: 'משחק הקלדה חינמי בעברית לילדים: מפוצצים בלונים עם אותיות ומילים ולומדים איפה כל אות במקלדת, עם ידיים שמראות איזו אצבע ללחוץ.' },
+  '/texts': { title: 'טקסטים להקלדה: היסטוריה, מדע וטבע | הקלדה עיוורת', priority: '0.8', crumb: 'טקסטים', info: 'texts',
+    desc: 'טקסטים קצרים ומעניינים לתרגול הקלדה עיוורת בעברית: היסטוריה, מדע וחלל, בעלי חיים והשפה העברית. אפשר גם לתרגל על חומר הלימוד שלכם.' },
+  '/leaderboard': { title: 'טבלת האלופים: המקלידים המהירים בעברית | הקלדה עיוורת', priority: '0.6', crumb: 'טבלת האלופים', info: 'leaderboard',
+    desc: 'מי מקליד הכי מהר בעברית? טבלת המהירות השבועית, טבלת כל הזמנים, משחק הבלונים ונקודות XP.' },
+  '/texts/mine': { title: 'תרגול הקלדה על טקסט משלכם | הקלדה עיוורת', desc: HOME_DESC, noindex: true },
   '/privacy': { title: 'מדיניות פרטיות | הקלדה עיוורת', priority: '0.3', crumb: 'מדיניות פרטיות',
     desc: 'איזה מידע האתר הקלדה עיוורת אוסף, איך הוא משמש ואיך אפשר למחוק אותו.' },
   '/profile': { title: 'הפרופיל שלי | הקלדה עיוורת', desc: HOME_DESC, noindex: true },
@@ -381,6 +499,14 @@ async function lessons(env, origin) {
   return list;
 }
 
+let textsCache = null;
+async function textsData(env, origin) {
+  if (textsCache) return textsCache;
+  const r = await env.ASSETS.fetch(new Request(origin + '/data/texts.json'));
+  textsCache = r.ok ? await r.json() : { categories: {}, texts: [] };
+  return textsCache;
+}
+
 async function pageMeta(env, url) {
   const path = url.pathname.replace(/\/+$/, '') || '/';
   if (PAGES[path]) return { path, ...PAGES[path] };
@@ -393,6 +519,17 @@ async function pageMeta(env, url) {
       path, lesson: l, total: all.length, crumb: `שיעור ${l.id}`,
       title: `שיעור ${l.id}: ${l.title} | הקלדה עיוורת`,
       desc: `שיעור ${l.id} מתוך ${all.length} בקורס ההקלדה העיוורת בעברית. ${l.desc}`,
+    };
+  }
+  const text = /^\/texts\/([\w-]+)$/.exec(path);
+  if (text) {
+    const data = await textsData(env, url.origin);
+    const t = data.texts.find(x => x.slug === text[1]);
+    if (!t) return null;
+    return {
+      path, text: t, category: data.categories[t.category] || '', crumb: t.title,
+      title: `${t.title}: טקסט להקלדה | הקלדה עיוורת`,
+      desc: `${t.intro} טקסט קצר על ${data.categories[t.category] || 'נושא מעניין'} לתרגול הקלדה עיוורת בעברית.`,
     };
   }
   if (/^\/custom\/[\w-]+$/.test(path)) return { path, title: 'שיעור אישי | הקלדה עיוורת', desc: HOME_DESC, noindex: true };
@@ -413,6 +550,7 @@ function structuredData(meta, origin, body) {
   } : null;
   const trail = [{ name: SITE, item: home }];
   if (meta.lesson) trail.push({ name: 'שיעורים', item: `${origin}/lessons` });
+  if (meta.text) trail.push({ name: 'טקסטים', item: `${origin}/texts` });
   if (meta.crumb) trail.push({ name: meta.crumb, item: `${origin}${meta.path}` });
   const crumbs = {
     '@type': 'BreadcrumbList',
@@ -450,6 +588,21 @@ function structuredData(meta, origin, body) {
       syllabusSections: body.lessons.map(l => ({ '@type': 'Syllabus', name: `שיעור ${l.id}: ${l.title}`, description: l.desc, url: `${origin}/lesson/${l.id}` })),
     });
   }
+  if (meta.text) {
+    graph.push({
+      '@type': 'Article', headline: meta.text.title, description: meta.text.intro, inLanguage: 'he',
+      articleSection: meta.category, url: `${origin}${meta.path}`, mainEntityOfPage: `${origin}${meta.path}`,
+      image: `${origin}/og-image.png`, author: { '@id': org['@id'] }, publisher: org, isAccessibleForFree: true,
+      audience: { '@type': 'Audience', audienceType: meta.text.audience === 'kids' ? 'ילדים' : 'כל הגילים' },
+    });
+  }
+  if (meta.path === '/game') {
+    graph.push({
+      '@type': 'VideoGame', name: 'משחק הבלונים', description: meta.desc, url: `${origin}/game`, inLanguage: 'he',
+      genre: 'משחק חינוכי', gamePlatform: 'דפדפן', applicationCategory: 'Game', isAccessibleForFree: true,
+      audience: { '@type': 'PeopleAudience', suggestedMinAge: 6 }, offers: { '@type': 'Offer', price: '0', priceCurrency: 'ILS' },
+    });
+  }
   if (faq) graph.push(faq);
   return { '@context': 'https://schema.org', '@graph': graph };
 }
@@ -482,9 +635,26 @@ async function pageBody(env, url, meta) {
 <ol>${all.map(l => `<li><a href="/lesson/${l.id}">שיעור ${l.id}: ${esc(l.title)}</a>. ${esc(l.desc)}</li>`).join('')}</ol></section>`;
     return { html: list + await fragment(env, url, 'lessons'), lessons: all };
   }
+  if (meta.path === '/texts') {
+    const data = await textsData(env, url.origin);
+    const list = `<section class="page"><h1>טקסטים להקלדה</h1>
+<p>מתרגלים הקלדה עיוורת ולומדים משהו חדש בדרך: היסטוריה, מדע, טבע והשפה העברית.</p>
+${Object.entries(data.categories).map(([k, name]) => `<h2>${esc(name)}</h2><ul>${data.texts.filter(t => t.category === k)
+    .map(t => `<li><a href="/texts/${t.slug}">${esc(t.title)}</a>. ${esc(t.intro)}</li>`).join('')}</ul>`).join('\n')}
+<p><a href="/texts/mine">תרגול על טקסט משלכם</a></p></section>`;
+    return { html: list + await fragment(env, url, 'texts') };
+  }
   if (meta.info) {
     const html = await fragment(env, url, meta.info);
     return { html, ssr: meta.info };
+  }
+  if (meta.text) {
+    const t = meta.text;
+    return {
+      html: `<article class="page"><div class="lesson-head"><a class="back" href="/texts">כל הטקסטים</a>
+<div class="lesson-meta">${esc(meta.category)} · ${esc(t.level)}</div><h1>${esc(t.title)}</h1><p>${esc(t.intro)}</p></div>
+<p>${esc(t.text)}</p></article>`,
+    };
   }
   if (meta.lesson) {
     const l = meta.lesson;
@@ -521,6 +691,7 @@ function withMeta(html, meta, origin, body) {
 async function sitemap(env, origin) {
   const paths = Object.entries(PAGES).filter(([, p]) => !p.noindex).map(([path, p]) => [path, p.priority]);
   (await lessons(env, origin)).forEach(l => paths.push([`/lesson/${l.id}`, '0.7']));
+  (await textsData(env, origin)).texts.forEach(t => paths.push([`/texts/${t.slug}`, '0.6']));
   const urls = paths.map(([p, pr]) => `  <url><loc>${origin}${p}</loc><priority>${pr}</priority></url>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
@@ -549,9 +720,15 @@ async function llmsTxt(env, url, origin) {
 - [מבחן הקלדה בעברית](${origin}/test): מבחן מהירות לפי זמן, מספר מילים או ציטוט.
 - [שיעורי הקלדה](${origin}/lessons): קורס של ${all.length} שיעורים מדורגים.
 - [תרגול חכם](${origin}/practice): תרגול שמתמקד במקשים החלשים של המשתמש.
+- [משחק הבלונים](${origin}/game): משחק הקלדה לילדים. מפוצצים בלונים עם אותיות ומילים.
+- [טקסטים להקלדה](${origin}/texts): טקסטים קצרים על היסטוריה, מדע, טבע והשפה העברית, ותרגול על חומר לימוד אישי.
+- [טבלת האלופים](${origin}/leaderboard): טבלת מהירות שבועית, משחק ונקודות XP.
 
 ## השיעורים
 ${all.map(l => `- [שיעור ${l.id}: ${l.title}](${origin}/lesson/${l.id}): ${l.desc}`).join('\n')}
+
+## טקסטים
+${(await textsData(env, url.origin)).texts.map(t => `- [${t.title}](${origin}/texts/${t.slug}): ${t.intro}`).join('\n')}
 `;
 }
 

@@ -1,278 +1,11 @@
 'use strict';
 
 (() => {
-  const view = $('#view');
-
-  // Page texts live in public/content/*.html. The server already puts the current page's text
-  // into the HTML (for search engines and AI crawlers); reuse it instead of fetching it again.
-  const contentCache = new Map();
-  if (view.dataset.ssr) contentCache.set(view.dataset.ssr, Promise.resolve(view.innerHTML));
-  function content(name) {
-    if (!contentCache.has(name)) {
-      contentCache.set(name, fetch(`/content/${name}.html`).then(r => (r.ok ? r.text() : '')).catch(() => ''));
-    }
-    return contentCache.get(name);
-  }
-  let routeToken = 0;
-  // Fills the #page-info box at the bottom of a page with its explanation text.
-  function fillInfo(name) {
-    const token = routeToken;
-    content(name).then(html => { const el = $('#page-info'); if (token === routeToken && el) el.innerHTML = html; });
-  }
-  const isTouch = matchMedia('(hover: none) and (pointer: coarse)').matches;
-
-  const Prefs = {
-    get hands() { return Store.get('hands', true); },
-    set hands(v) { Store.set('hands', !!v); },
-  };
-
-  const ICON = {
-    restart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
-    star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg>',
-    zap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>',
-    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
-    heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>',
-    next: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
-    hand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></svg>',
-    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
-    sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>',
-  };
-  const starsHtml = (n, cls = '') =>
-    `<span class="stars ${cls}" aria-label="${n} כוכבים">${[1, 2, 3].map(i => `<span class="${i <= n ? 'on' : ''}">${ICON.star}</span>`).join('')}</span>`;
-  const touchNote = () => isTouch ? '<p class="touch-note">האתר מיועד להקלדה במקלדת פיזית. חברו מקלדת כדי לתרגל.</p>' : '';
-  const statBox = (label, value, big) => `<div class="stat${big ? ' big' : ''}"><div class="label">${label}</div><div class="value">${value}</div></div>`;
-  const KIND_NAMES = { test: 'מבחן', lesson: 'שיעור', practice: 'תרגול', custom: 'שיעור אישי' };
-
-  function missedHtml(charStats) {
-    const missed = Object.entries(charStats).filter(([, s]) => s[1] > 0).sort((a, b) => b[1][1] - a[1][1]).slice(0, 8);
-    if (!missed.length) return `<div class="missed"><div class="missed-title">אף טעות, כל הכבוד!</div></div>`;
-    return `<div class="missed"><div class="missed-title">מקשים שבהם טעיתם</div><div class="chips">${
-      missed.map(([ch, s]) => `<span class="chip">${ch === ' ' ? 'רווח' : esc(ch)} <span class="num">×${s[1]}</span></span>`).join('')
-    }</div></div>`;
-  }
-
-  // ---------- Typing engine ----------
-  class Typer {
-    constructor(opts) {
-      this.o = opts;
-      this.el = opts.el;
-      this.strict = !!opts.strict;
-      this.timeLimit = opts.timeLimit || 0;
-      onResizeWhile(this.el, () => this.updateCaret());
-      this.reset(opts.text);
-    }
-
-    reset(text) {
-      clearInterval(this.timer);
-      Object.assign(this, {
-        pos: 0, typed: [], keystrokes: 0, correctKeys: 0, errors: 0, lastKey: null,
-        startTime: null, endTime: null, finished: false, charStats: {}, errPositions: new Set(),
-      });
-      this.el.classList.add('idle');
-      this.render(text);
-      this.o.onUpdate && this.o.onUpdate(this);
-    }
-
-    render(text) {
-      this.el.innerHTML = '';
-      this.wordsEl = document.createElement('div');
-      this.wordsEl.className = 'words';
-      this.caret = document.createElement('div');
-      this.caret.className = 'caret';
-      this.wordsEl.append(this.caret);
-      this.el.append(this.wordsEl);
-      Object.assign(this, { chars: [], spans: [], ltr: [], ranges: [], lastWord: null });
-      this.addWords(text.trim().split(/\s+/));
-      requestAnimationFrame(() => this.updateCaret());
-    }
-
-    letter(ch, parent, ltr) {
-      const s = document.createElement('span');
-      s.className = ch === ' ' ? 'l sp' : 'l';
-      s.textContent = ch;
-      parent.append(s);
-      this.chars.push(ch);
-      this.spans.push(s);
-      this.ltr.push(ltr);
-    }
-
-    addWords(words) {
-      if (this.lastWord) this.letter(' ', this.lastWord, false);
-      const frag = document.createDocumentFragment();
-      words.forEach((w, i) => {
-        const wordEl = document.createElement('div');
-        wordEl.className = 'word';
-        let box = wordEl;
-        const ltr = /\d/.test(w);
-        if (ltr) {
-          box = document.createElement('span');
-          box.className = 'ltr-run';
-          wordEl.append(box);
-        }
-        const start = this.chars.length;
-        for (const c of w) this.letter(c, box, ltr);
-        this.ranges.push([start, this.chars.length]);
-        if (i < words.length - 1) this.letter(' ', wordEl, false);
-        frag.append(wordEl);
-        this.lastWord = wordEl;
-      });
-      this.wordsEl.append(frag);
-    }
-
-    get wordCount() { return this.ranges.length; }
-    wordsDone() { return this.ranges.filter(([, end]) => end <= this.pos).length; }
-    nextChar() { return this.finished ? null : this.chars[this.pos]; }
-
-    wordsWhere(hasError) {
-      const text = this.chars.join('');
-      return this.ranges
-        .filter(([s, e]) => {
-          if (e > this.pos) return false;
-          for (let i = s; i < e; i++) if (this.errPositions.has(i)) return hasError;
-          return !hasError;
-        })
-        .map(([s, e]) => text.slice(s, e));
-    }
-    errorWords() { return this.wordsWhere(true); }
-    cleanWords() { return this.wordsWhere(false); }
-
-    start() {
-      this.startTime = performance.now();
-      this.el.classList.remove('idle');
-      this.timer = setInterval(() => {
-        if (this.timeLimit && (performance.now() - this.startTime) / 1000 >= this.timeLimit) this.finish(true);
-        else this.o.onTick && this.o.onTick(this);
-      }, 200);
-    }
-
-    finish(timedOut) {
-      if (this.finished) return;
-      this.finished = true;
-      clearInterval(this.timer);
-      this.endTime = timedOut ? this.startTime + this.timeLimit * 1000 : performance.now();
-      this.o.onFinish && this.o.onFinish(this.stats(), this);
-    }
-
-    stats() {
-      const end = this.endTime || performance.now();
-      const secs = this.startTime ? Math.max((end - this.startTime) / 1000, 0.5) : 0;
-      let correct = 0;
-      if (this.strict) correct = this.pos;
-      else for (let i = 0; i < this.pos; i++) if (this.typed[i] === this.chars[i]) correct++;
-      const mins = secs / 60;
-      return {
-        secs,
-        correct,
-        chars: this.pos,
-        incorrect: this.strict ? this.errors : this.pos - correct,
-        errors: this.errors,
-        wpm: secs ? correct / 5 / mins : 0,
-        cpm: secs ? correct / mins : 0,
-        acc: this.keystrokes ? (this.correctKeys / this.keystrokes) * 100 : 100,
-        charStats: this.charStats,
-      };
-    }
-
-    // Everything the profile needs from a finished session.
-    report(extra) {
-      const s = this.stats();
-      return {
-        ...extra, wpm: s.wpm, acc: s.acc, cpm: s.cpm, secs: s.secs, errors: s.errors, chars: s.chars,
-        keyStats: this.charStats, missedWords: this.errorWords(), cleanWords: this.cleanWords(),
-      };
-    }
-
-    handleKey(e) {
-      if (this.finished) return false;
-      if (e.key === 'Backspace') {
-        e.preventDefault();
-        if (this.strict || this.pos === 0) return true;
-        let target = this.pos - 1;
-        if (e.ctrlKey) while (target > 0 && this.chars[target - 1] !== ' ') target--;
-        for (let i = this.pos - 1; i >= target; i--) this.spans[i].classList.remove('correct', 'incorrect');
-        this.typed.length = target;
-        this.pos = target;
-        this.updateCaret();
-        this.o.onUpdate && this.o.onUpdate(this);
-        return true;
-      }
-      const ch = resolveChar(e);
-      if (!ch) return false;
-      e.preventDefault();
-      if (!this.startTime) this.start();
-
-      const now = performance.now();
-      const expected = this.chars[this.pos];
-      const ok = ch === expected;
-      const st = this.charStats[expected] || (this.charStats[expected] = [0, 0, 0, 0]);
-      this.keystrokes++;
-      if (ok) {
-        this.correctKeys++;
-        st[0]++;
-        // Time to find the key, ignoring long pauses.
-        if (this.lastKey != null && now - this.lastKey < 3000) { st[2] += Math.round(now - this.lastKey); st[3]++; }
-      } else {
-        this.errors++;
-        st[1]++;
-        this.errPositions.add(this.pos);
-      }
-      this.lastKey = now;
-      this.o.onPress && this.o.onPress(e.code, ok);
-
-      const span = this.spans[this.pos];
-      if (this.strict) {
-        if (ok) {
-          span.classList.add(span.classList.contains('miss') ? 'corrected' : 'correct');
-          this.pos++;
-        } else {
-          span.classList.add('miss');
-          this.el.classList.remove('shake');
-          void this.el.offsetWidth;
-          this.el.classList.add('shake');
-        }
-      } else {
-        this.typed[this.pos] = ch;
-        span.classList.add(ok ? 'correct' : 'incorrect');
-        this.pos++;
-      }
-
-      if (this.o.more && this.chars.length - this.pos < 80) this.addWords(this.o.more().split(' '));
-      this.updateCaret();
-      this.o.onUpdate && this.o.onUpdate(this);
-      if (this.pos >= this.chars.length) this.finish(false);
-      return true;
-    }
-
-    updateCaret() {
-      if (!this.spans.length) return;
-      const s = this.spans[this.pos];
-      let x, y;
-      if (s) {
-        x = this.ltr[this.pos] ? s.offsetLeft : s.offsetLeft + s.offsetWidth;
-        y = s.offsetTop;
-      } else {
-        const last = this.spans[this.spans.length - 1];
-        x = this.ltr[this.spans.length - 1] ? last.offsetLeft + last.offsetWidth : last.offsetLeft;
-        y = last.offsetTop;
-      }
-      this.caret.style.transform = `translate(${x - 1}px, ${y}px)`;
-      const lineStep = this.wordsEl.children[1] ? this.wordsEl.children[1].offsetHeight : 0;
-      if (lineStep) {
-        const line = Math.floor((y + 2) / lineStep);
-        this.wordsEl.style.transform = `translateY(${-Math.max(0, line - 1) * lineStep}px)`;
-      }
-    }
-
-    destroy() { clearInterval(this.timer); }
-  }
-
   // ---------- Router ----------
-  let cleanup = null;
-  let keyHandler = null;
   document.addEventListener('keydown', e => {
-    if (!keyHandler || $('dialog[open]')) return;
+    if (!Page.onKey || $('dialog[open]')) return;
     if (e.target instanceof Element && e.target.closest('input, textarea, select')) return;
-    keyHandler(e);
+    Page.onKey(e);
   });
 
   // Pages have real addresses (/test, /lesson/3 …) so search engines can index each one.
@@ -280,16 +13,18 @@
     if (path !== location.pathname) history.pushState(null, '', path);
     route();
   }
+  Page.navigate = navigate;
 
   let renderedPath = null;
   function route() {
-    if (cleanup) cleanup();
-    cleanup = null;
-    keyHandler = null;
-    routeToken++;
+    if (Page.onLeave) Page.onLeave();
+    Page.onLeave = null;
+    Page.onKey = null;
+    Page.token++;
     renderedPath = location.pathname;
     const [, page = '', arg] = location.pathname.replace(/\/+$/, '').split('/');
     const navKey = page === 'lesson' || page === 'custom' ? 'lessons' : page;
+    document.body.dataset.page = page || 'home';
     $$('.nav a').forEach(a => a.classList.toggle('active', a.dataset.nav === navKey));
     if (page === 'test') viewTest();
     else if (page === 'lessons') viewLessons();
@@ -300,6 +35,11 @@
     else if (page === 'admin') viewAdmin();
     else if (page === 'privacy') viewPrivacy();
     else if (page === 'guide') viewGuide();
+    else if (page === 'game') viewGame();
+    else if (page === 'leaderboard') viewLeaderboard();
+    else if (page === 'texts' && arg === 'mine') viewMyTexts();
+    else if (page === 'texts' && arg) viewText(arg);
+    else if (page === 'texts') viewTexts();
     else viewHome();
     if (!location.hash) window.scrollTo(0, 0);
     Ads.fill();
@@ -364,24 +104,20 @@
   $('#auth-close').onclick = () => authDlg.close();
   authDlg.addEventListener('click', e => { if (e.target === authDlg) authDlg.close(); });
 
-  // ---------- Shared typing page pieces ----------
-  function handsButton(onToggle) {
-    const b = document.createElement('button');
-    b.className = 'cfg-btn' + (Prefs.hands ? ' active' : '');
-    b.innerHTML = `${ICON.hand}<span>ידיים</span>`;
-    b.title = 'הצגת ידיים וירטואליות על המקלדת';
-    b.onclick = () => { Prefs.hands = !Prefs.hands; b.classList.toggle('active', Prefs.hands); onToggle(); };
-    return b;
-  }
-
   // ---------- Home ----------
   async function viewHome() {
     document.title = 'הקלדה עיוורת בעברית | מבחן הקלדה, שיעורים ותרגול';
-    const token = routeToken;
+    const token = Page.token;
     const html = await content('home');
-    if (token !== routeToken) return;
+    if (token !== Page.token) return;
     view.innerHTML = html;
     Ads.fill(view);
+    $$('[data-audience]', view).forEach(b => b.addEventListener('click', () => {
+      Prefs.kids = b.dataset.audience === 'kids';
+      $('#kids-toggle').classList.toggle('active', Prefs.kids);
+      Account.emit();
+      Page.navigate(Prefs.kids ? '/game' : '/test');
+    }));
 
     // A little demo: the hands "type" a phrase on the home keyboard.
     const kb = Keyboard($('#home-kb'), { colored: true, hands: true });
@@ -390,15 +126,18 @@
     const timer = setInterval(() => {
       if (!document.hidden) { kb.highlight(demo[i]); i = (i + 1) % demo.length; }
     }, 700);
-    cleanup = () => clearInterval(timer);
+    Page.onLeave = () => clearInterval(timer);
   }
 
   // ---------- Test ----------
   function viewTest() {
     document.title = 'מבחן הקלדה בעברית: בדקו את מהירות ההקלדה שלכם | הקלדה עיוורת';
     const cfg = Object.assign({ mode: 'time', time: 30, words: 25, punct: false, nums: false, kb: true }, Store.get('testCfg', {}));
+    const challenge = Share.challenge('מילים לדקה');
+    const words = n => randomWords(n, { ...cfg, kids: Prefs.kids });
     view.innerHTML = `
       <section class="page">
+        ${challenge ? challenge.html : ''}
         <div class="config" id="config"></div>
         <div class="stage" id="stage">
           <div class="live"><span class="live-main num" id="live-main"></span><span class="live-sub num" id="live-wpm"></span></div>
@@ -468,8 +207,8 @@
       let text;
       if (same && lastText) text = lastText;
       else if (cfg.mode === 'quote') { lastQuote = pick(QUOTES); text = lastQuote.text; }
-      else if (cfg.mode === 'words') text = randomWords(cfg.words, cfg);
-      else text = randomWords(80, cfg);
+      else if (cfg.mode === 'words') text = words(cfg.words);
+      else text = words(80);
       lastText = text;
       if (typer) typer.destroy();
       typer = null;
@@ -478,7 +217,7 @@
         el: $('#tb'),
         text,
         timeLimit: cfg.mode === 'time' ? cfg.time : 0,
-        more: cfg.mode === 'time' ? () => randomWords(40, cfg) : null,
+        more: cfg.mode === 'time' ? () => words(40) : null,
         onUpdate: tp => { live(tp); if (kb) kb.highlight(tp.nextChar()); },
         onTick: live,
         onPress: (code, ok) => kb && kb.flash(code, ok),
@@ -489,11 +228,15 @@
     function showResult(s, tp) {
       const mode = cfg.mode === 'quote' ? 'quote' : `${cfg.mode}-${cfg[cfg.mode]}${cfg.punct ? '-p' : ''}${cfg.nums ? '-n' : ''}`;
       const label = cfg.mode === 'time' ? `זמן ${cfg.time}` : cfg.mode === 'words' ? `מילים ${cfg.words}` : 'ציטוט';
-      const { isPb } = Account.record(tp.report({ kind: 'test', mode, label }));
+      const { isPb, reward } = Account.record(tp.report({ kind: 'test', mode, label }));
+      const wpm = Math.round(s.wpm);
+      const beat = challenge && wpm > challenge.value;
       $('#stage').hidden = true;
       const r = $('#result');
       r.hidden = false;
       r.innerHTML = `
+        ${beat ? `<div class="pb win-banner">ניצחתם את האתגר של ${challenge.name ? esc(challenge.name) : 'החבר/ה'}! 💪</div>` : ''}
+        ${Prefs.kids ? `<h2 class="result-title">${cheer()}</h2>` : ''}
         ${isPb ? '<div class="pb">שיא אישי חדש!</div>' : ''}
         <div class="result-top">
           ${statBox('מילים לדקה', Math.round(s.wpm), true)}
@@ -515,17 +258,24 @@
         </div>
         ${Ads.slot('results')}`;
       Ads.fill(r);
+      $('#result .actions').append(Share.button(() => ({
+        title: 'הקלדתי בעברית', big: wpm, unit: 'מילים לדקה',
+        chips: [`דיוק ${Math.round(s.acc)}%`, label, `${reward.after.rank.emoji} רמה ${reward.after.level}`],
+        url: Share.challengeUrl('/test', wpm),
+        message: `הקלדתי ${wpm} מילים לדקה בעברית ⌨️ תצליחו לנצח אותי?`,
+      })));
       $('#again').onclick = () => start();
       $('#same').onclick = () => start(true);
+      Celebrate.show(reward);
       if ($('#save-login')) $('#save-login').onclick = () => openAuth();
     }
 
     $('#restart').onclick = () => start();
-    keyHandler = e => {
+    Page.onKey = e => {
       if (e.key === 'Tab' || e.key === 'Escape') { e.preventDefault(); start(); return; }
       if (!$('#stage').hidden && typer) typer.handleKey(e);
     };
-    cleanup = () => typer && typer.destroy();
+    Page.onLeave = () => typer && typer.destroy();
     renderConfig();
     start();
   }
@@ -649,7 +399,7 @@
       const wpm = Math.round(s.wpm);
       const acc = Math.round(s.acc);
       const stars = acc >= 97 && wpm >= target ? 3 : acc >= 92 ? 2 : 1;
-      save(tp, stars);
+      const { reward } = save(tp, stars);
       const note = stars === 3 ? 'מעולה! עברתם את השיעור בהצטיינות.'
         : stars === 2 ? `יפה מאוד. לשלושה כוכבים: דיוק של 97% ומעלה ולפחות ${target} מילים לדקה.`
         : 'סיימתם את השיעור! נסו שוב והתמקדו בדיוק, לאט ובטוח.';
@@ -678,15 +428,22 @@
         </div>
         ${Ads.slot('results')}`;
       Ads.fill(r);
+      $('#result .actions').append(Share.button(() => ({
+        title, big: wpm, unit: 'מילים לדקה',
+        chips: ['⭐'.repeat(stars), `דיוק ${acc}%`],
+        url: `${location.origin}${location.pathname}`,
+        message: `סיימתי את "${title}" בקורס ההקלדה העיוורת בעברית ${'⭐'.repeat(stars)}`,
+      })));
       $('#again').onclick = start;
+      Celebrate.show(reward);
     }
 
-    keyHandler = e => {
+    Page.onKey = e => {
       if (e.key === 'Tab' || e.key === 'Escape') { e.preventDefault(); start(); return; }
       if (!$('#stage').hidden && typer) typer.handleKey(e);
       else if (e.key === 'Enter' && next) navigate(next.href);
     };
-    cleanup = () => typer && typer.destroy();
+    Page.onLeave = () => typer && typer.destroy();
     start();
   }
 
@@ -836,7 +593,8 @@
     }
 
     function finish(s, tp) {
-      Account.record(tp.report({ kind: 'practice', mode: `practice-${cfg.mode}`, label: `תרגול: ${MODE_NAMES[cfg.mode]}` }));
+      const { reward } = Account.record(tp.report({ kind: 'practice', mode: `practice-${cfg.mode}`, label: `תרגול: ${MODE_NAMES[cfg.mode]}` }));
+      Celebrate.show(reward);
       refreshHeat();
       if (cfg.noMistakes && s.errors > 0) {
         const missedWords = [...new Set(tp.errorWords())];
@@ -875,11 +633,11 @@
     $('#reset-stats').onclick = async () => {
       try { await Account.resetStats(); refreshHeat(); toast('נתוני המקשים אופסו'); } catch (e) { toast(e.message, true); }
     };
-    keyHandler = e => {
+    Page.onKey = e => {
       if (e.key === 'Tab' || e.key === 'Escape') { e.preventDefault(); start(); return; }
       if (!$('#stage').hidden && typer) typer.handleKey(e);
     };
-    cleanup = () => typer && typer.destroy();
+    Page.onLeave = () => typer && typer.destroy();
     renderConfig();
     refreshHeat();
     start();
@@ -990,6 +748,33 @@
     return { good, bad };
   }
 
+  // Level, XP bar, streak and all badges (earned ones lit up).
+  function levelCard(d) {
+    const g = Gamify.summary(d);
+    const earned = Gamify.state(d).badges;
+    const got = Gamify.BADGES.filter(b => earned[b[0]]).length;
+    return `
+      <div class="level-card">
+        <div class="lv-emoji">${g.rank.emoji}</div>
+        <div class="lv-body">
+          <div class="lv-title">רמה <b class="num">${g.level}</b> · ${esc(g.rank.name)}</div>
+          <div class="xp-bar" role="progressbar" aria-valuenow="${Math.round(g.levelProgress * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round(g.levelProgress * 100)}%"></span></div>
+          <div class="muted small">עוד <b class="num">${g.toNext.toLocaleString('he-IL')}</b> XP לרמה ${g.level + 1} · סך הכל <span class="num">${g.xp.toLocaleString('he-IL')}</span> XP</div>
+        </div>
+        <div class="lv-side">
+          <div class="lv-stat">${ICON.flame}<b class="num">${g.streak}</b><span>ימים ברצף</span></div>
+          <div class="lv-stat goal"><span class="gc-goal big" style="--p:${Math.round(g.goalProgress * 100)}"></span><span><b class="num">${g.today}/${g.goal}</b> XP היום</span></div>
+        </div>
+      </div>
+      <h2 class="section-title">🏅 תגים <span class="muted small num">${got}/${Gamify.BADGES.length}</span></h2>
+      <div class="badges">${Gamify.BADGES.map(([id, emoji, title, how]) => `
+        <div class="badge${earned[id] ? ' on' : ''}" title="${esc(how)}">
+          <span class="bd-emoji">${earned[id] ? emoji : '🔒'}</span>
+          <b>${esc(title)}</b>
+          <span class="muted small">${esc(how)}</span>
+        </div>`).join('')}</div>`;
+  }
+
   function viewProfile() {
     document.title = 'הפרופיל שלי | הקלדה עיוורת';
     const d = Account.data;
@@ -1020,6 +805,7 @@
           </div>
         </div>
 
+        ${levelCard(d)}
         ${!d.history.length ? `
           <div class="panel empty">
             <h2>עוד אין נתונים</h2>
@@ -1220,9 +1006,9 @@
   // ---------- Guide ----------
   async function viewGuide() {
     document.title = 'מדריך הקלדה עיוורת בעברית: אצבעות, שורת הבית ותוכנית לימוד | הקלדה עיוורת';
-    const token = routeToken;
+    const token = Page.token;
     const html = await content('guide');
-    if (token !== routeToken) return;
+    if (token !== Page.token) return;
     view.innerHTML = html;
     Ads.fill(view);
     if (location.hash.length > 1) { const el = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (el) el.scrollIntoView(); }
@@ -1256,12 +1042,37 @@
       </article>`;
   }
 
+  // ---------- Header: level, streak and daily goal ----------
+  function renderGameChip() {
+    const g = Gamify.summary(Account.data);
+    const el = $('#game-chip');
+    el.innerHTML = `
+      <span class="gc-streak${g.streak ? ' on' : ''}" title="ימים ברצף">${ICON.flame}<b class="num">${g.streak}</b></span>
+      <span class="gc-level" title="רמה ${g.level}: ${esc(g.rank.name)}">${g.rank.emoji}<b class="num">${g.level}</b></span>
+      <span class="gc-goal" title="יעד יומי: ${g.today} מתוך ${g.goal} XP" style="--p:${Math.round(g.goalProgress * 100)}"></span>`;
+    el.setAttribute('aria-label', `רמה ${g.level}, ${g.streak} ימים ברצף, ${g.today} מתוך ${g.goal} נקודות היום`);
+  }
+  Account.on(renderGameChip);
+
+  const kidsBtn = $('#kids-toggle');
+  const renderKids = () => { kidsBtn.classList.toggle('active', Prefs.kids); kidsBtn.title = Prefs.kids ? 'מצב ילדים פעיל' : 'מצב ילדים'; };
+  kidsBtn.addEventListener('click', () => {
+    Prefs.kids = !Prefs.kids;
+    renderKids();
+    renderGameChip();
+    toast(Prefs.kids ? 'מצב ילדים: אותיות גדולות ומילים פשוטות 🧒' : 'חזרה למצב רגיל');
+    route();
+  });
+  renderKids();
+
   // ---------- Theme ----------
+  const THEME_COLORS = { light: '#fbf8f3', dark: '#15141f' };
+  $('meta[name="theme-color"]').content = THEME_COLORS[document.documentElement.dataset.theme] || THEME_COLORS.dark;
   $('#theme-toggle').addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
     document.documentElement.dataset.theme = next;
     Store.set('theme', next);
-    $('meta[name="theme-color"]').content = next === 'light' ? '#e9e9e9' : '#22272e';
+    $('meta[name="theme-color"]').content = THEME_COLORS[next];
   });
 
   upgradeHashLink();
