@@ -44,7 +44,7 @@
   //   npx wrangler secret put ADMIN_EMAILS
   "vars": {
     "GOOGLE_CLIENT_ID": "964033939737-6a5je6rl6ptsjbmisoqb9vd29l608ith.apps.googleusercontent.com",
-    "GA_MEASUREMENT_ID": "",
+    "GA_MEASUREMENT_ID": "G-BP9SSJZFHZ",
     "ADSENSE_CLIENT": "",
     "ADSENSE_SLOT_HOME": "",
     "ADSENSE_SLOT_RESULTS": "",
