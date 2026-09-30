@@ -83,7 +83,7 @@ const Account = {
       d.lessons[r.lessonId] = { stars: Math.max(prev.stars, r.stars), wpm: Math.max(prev.wpm, wpm), acc: Math.max(prev.acc, Math.round(r.acc)) };
     }
     d.history.push(entry);
-    if (d.history.length > 500) d.history.splice(0, d.history.length - 500);
+    if (d.history.length > 1000) d.history.splice(0, d.history.length - 1000);
     d.totals.count++;
     d.totals.secs += entry.secs;
     Analytics.finish(r.kind, r.wpm, r.acc);

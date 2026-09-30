@@ -142,6 +142,26 @@ rich in them, a lesson for the weakest finger or row, or a lesson made of the pr
 practice page keeps generating rounds that put extra weight on the current weak letters, and shows
 a heat map of accuracy on the keyboard.
 
+## Progress over time
+
+The profile page shows how the user improves:
+
+- **Metrics:** speed (the daily average of typing tests), accuracy (the daily average of all typing,
+  weighted by characters) and typing time (minutes per day, or per week for ranges over 120 days).
+- **Ranges:** the last 30 days, the last 90 days or all time. The choice is remembered.
+- **Chart:** the points sit on a real time axis, so days off show as gaps in time, not as
+  neighbouring points. Speed and accuracy are lines, and typing time is bars. Hovering or the
+  arrow keys show the day and the number of tests.
+- **Then and now:** the average of the first three days in the range, the average of the last three,
+  and the change between them. For typing time, it shows the total, the number of practice days and
+  the average per day.
+- **Practice calendar:** up to a year of days, coloured by the XP earned each day, with the daily
+  goal as one of the steps, and the longest streak.
+- **Weekly table:** the same numbers week by week, as a readable alternative to the chart.
+
+Tests and lessons count toward the language they were typed in, so switching to English starts a
+separate speed line. History keeps the last 1,000 activities.
+
 ## Progress and game layer
 
 - **XP:**
@@ -272,6 +292,7 @@ test page show "can you beat it?" with the friend's score, and a message if the 
 | `public/js/game.js` | balloon game |
 | `public/js/texts.js` | text library and practice on your own text |
 | `public/js/leaderboard.js` | leaderboard page |
+| `public/js/progress.js` | progress over time: charts, practice calendar, weekly table |
 | `public/js/app.js` | router, header and the remaining pages |
 | `public/content/*.html` | page texts shared by the server-rendered HTML and the app |
 | `public/data/texts.json` | the educational texts |

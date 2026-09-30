@@ -815,11 +815,7 @@
           ${tile('שיעורים', `${lessonsDone}/${LESSONS.length}`, 'הושלמו')}
         </div>
 
-        <div class="panel">
-          <h2>מהירות במבחנים</h2>
-          <p class="panel-sub">מילים לדקה · ${Math.min(tests.length, 50)} המבחנים האחרונים</p>
-          ${tests.length >= 2 ? '<div class="chart" id="chart"></div>' : '<p class="muted">עשו לפחות שני מבחני הקלדה כדי לראות את גרף ההתקדמות.</p>'}
-        </div>
+        ${progressSection()}
 
         <div class="two-col">
           <div class="panel">
@@ -876,15 +872,7 @@
     if ($('#logout')) $('#logout').onclick = async () => { try { await Account.logout(); route(); } catch (e) { toast(e.message, true); } };
     if ($('#login-cta')) $('#login-cta').onclick = () => openAuth();
     if (!d.history.length) return;
-    if ($('#chart')) {
-      lineChart($('#chart'), tests.slice(-50), {
-        value: p => p.wpm,
-        label: p => fmtDate(p.at),
-        tipTitle: p => `${Math.round(p.wpm)} מילים לדקה`,
-        tipSub: p => `${p.label || 'מבחן'} · דיוק ${Math.round(p.acc)}% · ${fmtDate(p.at)}`,
-        aria: pts => `גרף מהירות: ${pts.length} מבחנים, אחרון ${Math.round(pts[pts.length - 1].wpm)} מילים לדקה`,
-      });
-    }
+    mountProgress(d);
     const kb = Keyboard($('#pkb'), { hands: true });
     kb.heat(d.keyStats);
     const rates = {};

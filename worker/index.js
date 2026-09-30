@@ -145,7 +145,7 @@ async function profile(env, user, cfg) {
     env.DB.prepare('SELECT lesson_id, stars, wpm, acc FROM lessons WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('SELECT mode, wpm FROM pbs WHERE user_id = ?1').bind(user.id),
     env.DB.prepare(`SELECT at, kind, mode, label, wpm, acc, cpm, secs, errors, chars, lesson_id, stars
-                    FROM results WHERE user_id = ?1 ORDER BY at DESC LIMIT 300`).bind(user.id),
+                    FROM results WHERE user_id = ?1 ORDER BY at DESC LIMIT 1000`).bind(user.id),
     env.DB.prepare('SELECT COUNT(*) AS count, COALESCE(SUM(secs), 0) AS secs FROM results WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('SELECT data, nickname, show_on_board FROM user_state WHERE user_id = ?1').bind(user.id),
   ]);
@@ -389,7 +389,7 @@ async function api(request, env, route, cfg) {
     // Merge progress a guest collected in the browser into their account.
     const body = await readJson(request);
     const keys = cleanKeyStats(body.keyStats);
-    const history = Array.isArray(body.history) ? body.history.slice(-500).map(cleanResult).filter(Boolean) : [];
+    const history = Array.isArray(body.history) ? body.history.slice(-1000).map(cleanResult).filter(Boolean) : [];
     const words = body.wordErrors && typeof body.wordErrors === 'object'
       ? Object.entries(body.wordErrors).slice(0, 300).filter(([w]) => w.length <= 30).map(([w, c]) => [w, int(c, 1, 1000)]) : [];
     const lessons = body.lessons && typeof body.lessons === 'object'

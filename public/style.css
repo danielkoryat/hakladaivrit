@@ -696,6 +696,45 @@ details p { margin: .6rem 0 0 !important; color: var(--c-sub-alt); }
   font-size: .8rem;
 }
 .c-tip strong { font-size: .95rem; color: var(--c-text); }
+.c-dot.small { stroke-width: 1.5; }
+.c-bar { fill: var(--c-chart); }
+
+/* ---------- Progress over time ---------- */
+.pg-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 1rem; margin: 1.6rem 0 .8rem; }
+.pg-top .section-title { margin: 0; }
+.pg-filters { margin: 0; }
+.pg-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; margin-bottom: 1rem; }
+.pg-summary:empty { display: none; }
+.pg-fig { display: flex; flex-direction: column; gap: .1rem; padding: .7rem .9rem; border-radius: var(--radius); background: var(--c-background); }
+.pg-label { color: var(--c-sub-alt); font-size: .8rem; }
+.pg-value { font-size: 1.6rem; font-weight: 600; line-height: 1.25; direction: ltr; unicode-bidi: isolate; text-align: right; }
+.pg-value.up { color: var(--c-success); }
+.pg-value.down { color: var(--c-error); }
+.pg-sub { color: var(--c-sub-alt); font-size: .75rem; }
+.pg-empty { padding: 2.5rem 0; text-align: center; }
+.pg-table { margin-top: .8rem; }
+.pg-table summary { cursor: pointer; color: var(--c-primary); font-size: .9rem; }
+.calendar { position: relative; overflow: hidden; }
+.calendar svg { display: block; margin-inline-start: auto; }
+.cal-cell { fill: var(--c-key); }
+.cal-cell.lv1 { fill: color-mix(in oklab, var(--c-chart) 30%, var(--c-key)); }
+.cal-cell.lv2 { fill: color-mix(in oklab, var(--c-chart) 55%, var(--c-key)); }
+.cal-cell.lv3 { fill: color-mix(in oklab, var(--c-chart) 80%, var(--c-key)); }
+.cal-cell.lv4 { fill: var(--c-chart); }
+.cal-cell.today { stroke: var(--c-text); stroke-width: 1.5; }
+.cal-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1rem; margin-top: .6rem; color: var(--c-sub-alt); font-size: .85rem; }
+.cal-legend { display: inline-flex; align-items: center; gap: 3px; font-size: .78rem; }
+.cal-legend i { width: 11px; height: 11px; border-radius: 3px; background: var(--c-key); }
+.cal-legend i.lv1 { background: color-mix(in oklab, var(--c-chart) 30%, var(--c-key)); }
+.cal-legend i.lv2 { background: color-mix(in oklab, var(--c-chart) 55%, var(--c-key)); }
+.cal-legend i.lv3 { background: color-mix(in oklab, var(--c-chart) 80%, var(--c-key)); }
+.cal-legend i.lv4 { background: var(--c-chart); }
+@media (max-width: 560px) {
+  .pg-summary { gap: .5rem; }
+  .pg-fig { padding: .55rem .6rem; }
+  .pg-value { font-size: 1.25rem; }
+  .pg-filters .cfg-sep { display: none; }
+}
 .c-tip span { color: var(--c-sub-alt); }
 
 /* ---------- Ads ---------- */
