@@ -276,19 +276,19 @@
 
   // ---------- Lessons list ----------
   function viewLessons() {
-    document.title = `שיעורי הקלדה עיוורת ${IN_LANG}: 16 שיעורים מדורגים | הקלדה עיוורת`;
-    const prog = Account.data.lessons;
-    const done = LESSONS.filter(l => prog[l.pid] && prog[l.pid].stars).length;
+    document.title = `שיעורי הקלדה עיוורת ${IN_LANG}: ${LESSONS.length} שיעורים מדורגים | הקלדה עיוורת`;
+    const prog = l => lessonProg(Account.data, l);
+    const done = LESSONS.filter(l => prog(l)?.stars).length;
     const pct = Math.round((done / LESSONS.length) * 100);
     const groups = [...new Set(LESSONS.map(l => l.group))];
-    const typeLabel = { words: 'מילים נפוצות', sentences: 'משפטים שלמים', review: 'חזרה' };
+    const typeLabel = { words: 'מילים נפוצות', sentences: 'משפטים שלמים', quotes: 'ציטוטים', prefixes: 'תחיליות', caps: 'Shift', review: 'חזרה' };
     const custom = customLessons(analyze(Account.data));
     view.innerHTML = `
       <section class="page">
         <div class="lessons-top page-head">
           <div>
             <h1>שיעורי הקלדה</h1>
-            <p>מתחילים בשורת הבית ומתקדמים שורה אחרי שורה. כל שיעור מוסיף כמה מקשים חדשים.</p>
+            <p>מתחילים בשורת הבית, ומשם כל שיעור מוסיף שני מקשים חדשים, מהאותיות הנפוצות אל הנדירות. כל קבוצה נגמרת בשיעור חזרה.</p>
           </div>
           <div class="overall">
             <span class="pct">${pct}%</span>
@@ -305,7 +305,7 @@
           <h2 class="section-title">${g}</h2>
           <div class="lesson-grid">
             ${LESSONS.filter(l => l.group === g).map(l => {
-              const p = prog[l.pid];
+              const p = prog(l);
               const keys = l.newKeys.length
                 ? `<div class="lc-keys">${l.newKeys.map(k => `<span class="kc">${esc(k)}</span>`).join('')}</div>`
                 : `<div class="lc-type">${typeLabel[l.type] || typeLabel.review}</div>`;
@@ -335,7 +335,7 @@
   }
 
   // ---------- Lesson runner (regular and personalised lessons) ----------
-  function runLesson({ docTitle, meta, title, desc, focusKeys, dimTo, makeText, target, save, next }) {
+  function runLesson({ docTitle, meta, title, desc, focusKeys, dimTo, makeText, target, save, next, strict = true, eyeStars = false }) {
     document.title = docTitle;
     view.innerHTML = `
       <section class="page">
@@ -356,21 +356,59 @@
         ${touchNote()}
       </section>`;
 
-    let kb = null, typer = null;
+    let kb = null, typer = null, hintTimer = 0;
     function buildKeyboard() {
       kb = Keyboard($('#kbw'), { colored: true, hands: Prefs.hands });
       if (dimTo) kb.dimExcept(dimTo);
       kb.mark(focusKeys, 'focus');
+      $('#stage').classList.toggle('blind', Prefs.blind);
       if (typer) update(typer);
     }
-    $('#tools').append(handsButton(buildKeyboard));
+    $('#tools').append(handsButton(buildKeyboard), blindButton(buildKeyboard));
+    if (eyeStars) $('#tools').append(eyeStarsButton(scheduleStar));
+
+    // Eye stars (after Yechiam et al., 2003): now and then a star shows above the text for a
+    // moment, and Enter catches it for bonus XP. Only eyes on the screen notice it, so keeping
+    // them there pays off more than glancing down at the keys.
+    const eyes = { timer: 0, el: null, shown: 0, caught: 0 };
+    function scheduleStar() {
+      clearTimeout(eyes.timer);
+      if (eyeStars && Prefs.eyeStars) eyes.timer = setTimeout(showStar, 6000 + rand(9000));
+    }
+    function showStar() {
+      // Only while typing: started, not finished, and a key pressed in the last 3 seconds.
+      if (!typer || !typer.startTime || typer.finished || performance.now() - typer.lastKey > 3000) { scheduleStar(); return; }
+      const tb = $('#tb');
+      const el = document.createElement('div');
+      el.className = 'eye-star';
+      el.innerHTML = `${ICON.star}<span>Enter</span>`;
+      el.style.top = `${tb.offsetTop}px`;
+      el.style.insetInlineStart = `${10 + rand(70)}%`;
+      $('#stage').append(el);
+      eyes.el = el;
+      eyes.shown++;
+      setTimeout(() => { if (eyes.el === el) { dropStar('gone'); scheduleStar(); } }, 2500);
+    }
+    function dropStar(cls) {
+      const el = eyes.el;
+      eyes.el = null;
+      if (!el) return;
+      el.classList.add(cls);
+      setTimeout(() => el.remove(), 500);
+    }
+    function stopStars() { clearTimeout(eyes.timer); dropStar('gone'); }
 
     function update(tp) {
       const ch = tp.nextChar();
       const finger = kb.highlight(ch);
       $('#bar').style.width = (tp.pos / tp.chars.length) * 100 + '%';
-      $('#hint').innerHTML = ch == null ? '' :
+      const hint = $('#hint');
+      hint.innerHTML = ch == null ? '' :
         `הקישו <span class="hint-key">${ch === ' ' ? 'רווח' : esc(ch)}</span> עם <span class="hint-finger">${FINGER_NAMES[finger] || ''}</span>`;
+      // In blind mode the hint waits: it shows only when the next key takes a while to find.
+      clearTimeout(hintTimer);
+      hint.classList.remove('reveal');
+      if (Prefs.blind && ch != null) hintTimer = setTimeout(() => hint.classList.add('reveal'), 1500);
     }
 
     function start() {
@@ -378,22 +416,30 @@
       $('#stage').hidden = false;
       if (typer) typer.destroy();
       typer = null;
+      stopStars();
+      Object.assign(eyes, { shown: 0, caught: 0 });
       buildKeyboard();
       typer = new Typer({
         el: $('#tb'),
         text: makeText(),
-        strict: true,
+        strict,
         onUpdate: update,
         onPress: (code, ok) => kb.flash(code, ok),
         onFinish: finish,
       });
+      scheduleStar();
     }
 
     function finish(s, tp) {
+      stopStars();
       const wpm = Math.round(s.wpm);
       const acc = Math.round(s.acc);
       const stars = acc >= 97 && wpm >= target ? 3 : acc >= 92 ? 2 : 1;
-      const { reward } = save(tp, stars);
+      const { reward } = save(tp, stars, eyes.caught);
+      const eyeNote = !eyes.shown ? ''
+        : `<p class="eye-note">${ICON.star} תפסתם ${eyes.caught} מתוך ${eyes.shown} כוכבי עיניים${eyes.caught ? ` (+${eyes.caught * 3} נקודות)` : ''}. ${eyes.caught === eyes.shown
+          ? 'העיניים נשארו על המסך, בדיוק כמו שצריך.'
+          : 'כוכב שפוספס הוא בדרך כלל סימן שהעיניים ירדו למקלדת.'}</p>`;
       const note = stars === 3 ? 'מעולה! עברתם את השיעור בהצטיינות.'
         : stars === 2 ? `יפה מאוד. לשלושה כוכבים: דיוק של 97% ומעלה ולפחות ${target} מילים לדקה.`
         : 'סיימתם את השיעור! נסו שוב והתמקדו בדיוק, לאט ובטוח.';
@@ -404,6 +450,7 @@
         ${starsHtml(stars, 'big')}
         <h2 class="result-title">הושלם: ${esc(title)}</h2>
         <p class="result-note">${note}</p>
+        ${eyeNote}
         <div class="result-top">
           ${statBox('מילים לדקה', wpm, true)}
           ${statBox('דיוק', acc + '%', true)}
@@ -434,10 +481,11 @@
 
     Page.onKey = e => {
       if (e.key === 'Tab' || e.key === 'Escape') { e.preventDefault(); start(); return; }
+      if (e.key === 'Enter' && eyes.el) { e.preventDefault(); eyes.caught++; dropStar('caught'); scheduleStar(); return; }
       if (!$('#stage').hidden && typer) typer.handleKey(e);
       else if (e.key === 'Enter' && next) navigate(next.href);
     };
-    Page.onLeave = () => typer && typer.destroy();
+    Page.onLeave = () => { clearTimeout(hintTimer); stopStars(); if (typer) typer.destroy(); };
     start();
   }
 
@@ -451,12 +499,16 @@
       meta: `שיעור ${id} מתוך ${LESSONS.length} · ${esc(lesson.group)}`,
       title: lesson.title,
       desc: lesson.desc,
-      focusKeys: lesson.newKeys,
-      dimTo: lesson.type ? null : [...lessonLetters(idx), ' '],
+      focusKeys: lesson.review ? groupLetters(idx) : lesson.newKeys,
+      dimTo: lesson.type ? null : [...lessonKeys(idx), ' '],
       makeText: () => lessonText(lesson, idx),
       target: lesson.target,
-      save: (tp, stars) => Account.record(tp.report({ kind: 'lesson', mode: `lesson-${lesson.pid}`, label: `שיעור ${id}${LANG === 'en' ? ' · אנגלית' : ''}`, lessonId: lesson.pid, stars })),
+      save: (tp, stars, eyes) => Account.record(tp.report({ kind: 'lesson', mode: `lesson-${lesson.pid}`, label: `שיעור ${id}${LANG === 'en' ? ' · אנגלית' : ''}`, lessonId: lesson.pid, stars, eyes })),
       next: nextLesson ? { href: `/lesson/${nextLesson.id}`, label: 'לשיעור הבא' } : { href: '/profile', label: 'לניתוח הביצועים' },
+      // The real-typing lessons let you type past a mistake and fix it, as in real typing.
+      strict: !lesson.free,
+      // Eye stars start after the home row, once there is something to look away from.
+      eyeStars: idx >= 4,
     });
   }
 
@@ -481,10 +533,12 @@
   function viewPractice() {
     document.title = `תרגול הקלדה ${IN_LANG} שמתמקד במקשים החלשים שלכם | הקלדה עיוורת`;
     const cfg = Object.assign({ mode: 'weak', noMistakes: true }, Store.get('practiceCfg', {}));
-    const MODE_NAMES = { weak: 'מקשים חלשים', common: 'מילים נפוצות', sentences: 'משפטים' };
+    const MODE_NAMES = { weak: 'מקשים חלשים', adaptive: 'פתיחת אותיות', common: 'מילים נפוצות', sentences: 'משפטים' };
+    const adaptive = () => cfg.mode === 'adaptive';
     view.innerHTML = `
       <section class="page">
         <div class="config" id="config"></div>
+        <div class="ad-panel" id="ad-panel" hidden></div>
         <div class="banner" id="banner" hidden></div>
         <div class="stage" id="stage">
           <div class="live"><span class="live-main num" id="live-main"></span><span class="live-sub" id="live-sub"></span></div>
@@ -525,25 +579,48 @@
           ${Object.entries(MODE_NAMES).map(([k, n]) => b('mode', k, n, cfg.mode === k)).join('')}
         </div>
         <div class="cfg-sep"></div>
+        ${adaptive() ? `<div class="cfg-sep"></div><div class="cfg-group">${[20, 25, 30, 40].map(t => b('target', t, `${t} wpm`, Adaptive.state().target === t)).join('')}</div>` : ''}
+        <div class="cfg-sep"></div>
         <div class="cfg-group" id="view-group">${b('toggle', 'noMistakes', 'ללא טעויות', cfg.noMistakes)}</div>`;
       $('#view-group').append(handsButton(buildKeyboard));
     }
     $('#config').addEventListener('click', e => {
-      const t = e.target.closest('button[data-mode], button[data-toggle]');
+      const t = e.target.closest('button[data-mode], button[data-toggle], button[data-target]');
       if (!t) return;
       if (t.dataset.mode) cfg.mode = t.dataset.mode;
       if (t.dataset.toggle) cfg.noMistakes = !cfg.noMistakes;
+      if (t.dataset.target) { const s = Adaptive.state(); s.target = Number(t.dataset.target); Adaptive.save(s); }
       Store.set('practiceCfg', cfg);
       renderConfig();
       start();
     });
 
+    // The letter-unlocking panel: every letter in the order it opens, filled by its progress
+    // toward the target. The letter the round concentrates on is outlined.
+    function renderAdaptive() {
+      const el = $('#ad-panel');
+      el.hidden = !adaptive();
+      if (!adaptive()) return;
+      const s = Adaptive.state();
+      const focus = Adaptive.focus(s);
+      el.innerHTML = `
+        <div class="ad-letters">${ADAPTIVE_ORDER.map((ch, i) => {
+          if (i >= s.n) return `<span class="ad-l locked">${esc(ch)}</span>`;
+          const p = Math.round(Adaptive.progress(s, ch) * 100);
+          return `<span class="ad-l${p >= 100 ? ' ready' : ''}${ch === focus ? ' focus' : ''}" style="--p:${p}%" title="${p}%">${esc(ch)}</span>`;
+        }).join('')}</div>
+        <p class="ad-note">פתוחות ${s.n} מתוך ${ADAPTIVE_ORDER.length} אותיות, לפי סדר השכיחות. האות הבאה נפתחת כשכל האותיות הפתוחות מגיעות ל־${s.target} מילים לדקה בדיוק של 95%. בכל סבב מתמקדים באות <b>${esc(focus)}</b>, הרחוקה ביותר מהיעד. <button class="link-btn" id="ad-reset">להתחיל מחדש</button></p>`;
+      $('#ad-reset').onclick = () => { Adaptive.reset(s.target); renderAdaptive(); start(); };
+    }
+
     function buildKeyboard() {
       kb = Keyboard($('#kbw'), { hands: Prefs.hands });
+      if (adaptive()) kb.dimExcept([...Adaptive.open(Adaptive.state()), ' ']);
       if (typer) kb.highlight(typer.nextChar());
     }
 
     function freshText(n = 25) {
+      if (adaptive()) return Adaptive.text(Adaptive.state());
       if (cfg.mode === 'sentences') return shuffle(SENTENCES).slice(0, 3).join(' ');
       if (cfg.mode === 'weak') {
         const weak = weakLetters();
@@ -567,6 +644,7 @@
 
     function start(text, keepRound) {
       if (!keepRound) { round = 1; banner(''); }
+      renderAdaptive();
       if (!text && cfg.mode === 'weak' && !weakLetters().length) {
         banner('עוד אין מספיק נתונים על המקשים החלשים שלכם, אז בינתיים מתרגלים מילים נפוצות.', true);
       }
@@ -590,6 +668,16 @@
       const { reward } = Account.record(tp.report({ kind: 'practice', mode: `practice-${cfg.mode}`, label: `תרגול: ${MODE_NAMES[cfg.mode]}` }));
       Celebrate.show(reward);
       refreshHeat();
+      // Letter unlocking runs round after round, like keybr: the next round starts at once.
+      if (adaptive()) {
+        const opened = Adaptive.update(Adaptive.state(), s.charStats);
+        round++;
+        banner(opened
+          ? `נפתחה אות חדשה: <b>${esc(opened)}</b>! כל האותיות הקודמות הגיעו ליעד.`
+          : `סבב ${round - 1}: ${Math.round(s.wpm)} מילים לדקה, דיוק ${Math.round(s.acc)}%.`, !!opened);
+        start(null, true);
+        return;
+      }
       if (cfg.noMistakes && s.errors > 0) {
         const missedWords = [...new Set(tp.errorWords())];
         round++;
@@ -731,7 +819,7 @@
     }
     if (a.strongestFinger) good.push(`האצבע החזקה שלך: ${a.strongestFinger.name} (${pct(a.strongestFinger.acc)} דיוק).`);
     if (a.strongKeys.length) good.push(`המקשים המדויקים והמהירים שלך: ${a.strongKeys.map(k => k.ch).join(' ')}.`);
-    const doneLessons = LESSONS.filter(l => d.lessons[l.pid] && d.lessons[l.pid].stars).length;
+    const doneLessons = LESSONS.filter(l => lessonProg(d, l)?.stars).length;
     if (doneLessons) good.push(`השלמת ${doneLessons} מתוך ${LESSONS.length} שיעורים.`);
 
     if (a.weakKeys.length) bad.push(`דיוק נמוך במקשים: ${a.weakKeys.map(k => `${k.ch} (${pct(k.acc)})`).join(', ')}.`);
@@ -781,7 +869,7 @@
     const recent = tests.slice(-10);
     const delta = a.trend.prevWpm != null && a.trend.recentWpm != null ? Math.round(a.trend.recentWpm - a.trend.prevWpm) : null;
     const tile = (label, value, sub) => `<div class="tile"><div class="tile-label">${label}</div><div class="tile-value num">${value}</div>${sub ? `<div class="tile-sub">${sub}</div>` : ''}</div>`;
-    const lessonsDone = LESSONS.filter(l => d.lessons[l.pid] && d.lessons[l.pid].stars).length;
+    const lessonsDone = LESSONS.filter(l => lessonProg(d, l)?.stars).length;
     const recentRows = d.history.slice(-15).reverse();
 
     view.innerHTML = `

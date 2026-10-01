@@ -17,7 +17,7 @@ const MONTHS = ['ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יונ�
 // practice and texts can be either, so they count for both.
 function resultLang(h) {
   const m = h.mode || '';
-  if (m.startsWith('en-') || /^lesson-1\d\d$/.test(m)) return 'en';
+  if (m.startsWith('en-') || /^lesson-[13]\d\d$/.test(m)) return 'en';
   if (h.kind === 'test' || h.kind === 'lesson') return 'he';
   return null;
 }

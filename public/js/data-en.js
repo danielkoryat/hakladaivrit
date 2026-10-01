@@ -74,45 +74,135 @@ const EN_QUOTES = [
   { text: 'Imagination is more important than knowledge.', source: 'Albert Einstein' },
 ];
 
-// The same course as the Hebrew one, on the same physical keys, with English letters.
-// Progress is stored under 100 + id so it never mixes with the Hebrew lessons.
+
+// The English course, on the same physical keys, with explanations in Hebrew. Home row
+// first, then two keys at a time by how common they are in English (e i r u t o before the
+// rare v b x q z). Progress is stored under pid (300 + id), apart from the Hebrew course;
+// `legacy` lists lessons of the earlier 16-lesson English course (stored as 100 + id).
 const EN_LESSONS = [
-  { id: 1, group: 'שורת הבית', title: 'יד שמאל: a s d f', newKeys: ['a', 's', 'd', 'f'], target: 12,
-    desc: 'הניחו את אצבעות יד שמאל על a s d f. האצבע המורה נחה על f, ויש עליו בליטה קטנה שעוזרת למצוא אותו בלי להסתכל.' },
-  { id: 2, title: 'יד ימין: j k l ;', newKeys: ['j', 'k', 'l', ';'], target: 12,
-    desc: 'אצבעות יד ימין על j k l ;. האצבע המורה נחה על j (גם עליו יש בליטה). האגודלים על מקש הרווח.' },
-  { id: 3, title: 'g ו־h', newKeys: ['g', 'h'], target: 12,
-    desc: 'האצבע המורה השמאלית נמתחת ימינה אל g, והאצבע המורה הימנית נמתחת שמאלה אל h. אחרי כל הקשה חוזרים לשורת הבית.' },
-  { id: 4, title: 'חזרה: שורת הבית', newKeys: [], review: true, target: 14,
-    desc: 'כל מקשי שורת הבית יחד. התמקדו בדיוק, בלי להסתכל על המקלדת.' },
-  { id: 5, group: 'השורה העליונה', title: 'r t y u', newKeys: ['r', 't', 'y', 'u'], target: 14,
-    desc: 'האצבעות המורות עולות לשורה העליונה: שמאל אל r ו־t, ימין אל y ו־u.' },
-  { id: 6, title: 'e ו־i', newKeys: ['e', 'i'], target: 14,
-    desc: 'אצבעות האמה עולות שורה: האמה השמאלית אל e והאמה הימנית אל i.' },
-  { id: 7, title: 'q w o p', newKeys: ['q', 'w', 'o', 'p'], target: 14,
-    desc: 'הקמיצות והזרתות עולות: הזרת השמאלית אל q, הקמיצה השמאלית אל w, הקמיצה הימנית אל o והזרת הימנית אל p.' },
-  { id: 8, title: 'חזרה: שורת הבית והשורה העליונה', newKeys: [], review: true, target: 16,
-    desc: 'משלבים את שתי השורות. זכרו לחזור עם כל אצבע למקומה בשורת הבית.' },
-  { id: 9, group: 'השורה התחתונה', title: 'v b n m', newKeys: ['v', 'b', 'n', 'm'], target: 16,
-    desc: 'האצבעות המורות יורדות לשורה התחתונה: שמאל אל v ו־b, ימין אל n ו־m.' },
-  { id: 10, title: 'c x z', newKeys: ['c', 'x', 'z'], target: 16,
-    desc: 'האמה השמאלית יורדת אל c, הקמיצה השמאלית אל x והזרת השמאלית אל z.' },
-  { id: 11, title: 'חזרה: כל האותיות', newKeys: [], review: true, target: 18,
-    desc: 'כל 26 האותיות האנגליות. עכשיו אתם מכירים את כל המקלדת!' },
-  { id: 12, group: 'שלב מתקדם', title: 'אותיות גדולות (Shift)', newKeys: [], type: 'caps', target: 16,
-    desc: 'לאות גדולה לוחצים על Shift ביד הנגדית: אות של יד שמאל עם Shift ימני, ואות של יד ימין עם Shift שמאלי.' },
-  { id: 13, title: 'פיסוק: נקודה ופסיק', newKeys: ['.', ','], type: 'punct', target: 18,
-    desc: 'בפריסה האנגלית הפסיק נמצא על מקש , (האמה הימנית) והנקודה על מקש . (הקמיצה הימנית).' },
-  { id: 14, title: 'מילים נפוצות', newKeys: [], type: 'words', target: 20,
-    desc: 'המילים השכיחות ביותר באנגלית. ככל שתקלידו אותן יותר, כך הן יהפכו לתנועה אחת רציפה.' },
-  { id: 15, title: 'משפטים', newKeys: [], type: 'sentences', target: 20,
-    desc: 'משפטים שלמים באנגלית עם אותיות גדולות, רווחים ופיסוק, כמו הקלדה אמיתית.' },
-  { id: 16, title: 'מספרים', newKeys: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'], type: 'numbers', target: 16,
-    desc: 'שורת המספרים. כל אצבע עולה שתי שורות מעל מקומה בשורת הבית.' },
+  { id: 1, group: 'שורת הבית', title: 'האצבעות המורות והאמות: f j d k', newKeys: ['f', 'j', 'd', 'k'], target: 10, legacy: [102, 104, 111],
+    desc: 'הניחו את האצבע המורה השמאלית על f ואת הימנית על j. על שני המקשים האלה יש בליטה קטנה, ובעזרתה מוצאים אותם בלי להסתכל. האמות נחות לידן, על d ועל k, והאגודלים על מקש הרווח.' },
+  { id: 2, title: 'הקמיצות והזרתות: s l a ;', newKeys: ['s', 'l', 'a', ';'], target: 10, legacy: [102, 104, 111],
+    desc: 'ביד שמאל הקמיצה נחה על s והזרת על a. ביד ימין הקמיצה נחה על l והזרת על ;.' },
+  { id: 3, title: 'g ו־h', newKeys: ['g', 'h'], target: 11, legacy: [103, 104, 111],
+    desc: 'האצבע המורה השמאלית נמתחת ימינה מ־f אל g, והאצבע המורה הימנית נמתחת שמאלה מ־j אל h. אחרי כל הקשה חוזרים לשורת הבית.' },
+  { id: 4, title: 'חזרה: שורת הבית', newKeys: [], review: true, target: 12, legacy: [104, 111],
+    desc: 'כל מקשי שורת הבית יחד, במילים כמו all, ask, had ו־glass. התמקדו בדיוק, בלי להסתכל על המקלדת.' },
+
+  { id: 5, group: 'האותיות הנפוצות', title: 'e ו־i', newKeys: ['e', 'i'], target: 12, legacy: [111],
+    desc: 'e היא האות הנפוצה ביותר באנגלית. האמה השמאלית עולה מ־d אל e, והאמה הימנית עולה מ־k אל i.' },
+  { id: 6, title: 'r ו־u', newKeys: ['r', 'u'], target: 13, legacy: [111],
+    desc: 'האצבעות המורות עולות לשורה העליונה: השמאלית מ־f אל r, והימנית מ־j אל u.' },
+  { id: 7, title: 't ו־o', newKeys: ['t', 'o'], target: 13, legacy: [111],
+    desc: 'האצבע המורה השמאלית נמתחת למעלה וימינה אל t, והקמיצה הימנית עולה מ־l אל o. מעכשיו אפשר להקליד את the, to ו־that.' },
+  { id: 8, title: 'חזרה: האותיות הנפוצות', newKeys: [], review: true, target: 14, legacy: [111],
+    desc: 'שורת הבית יחד עם e i r u t o. עם האותיות האלה כבר אפשר להקליד יותר מ־40% מהמילים בטקסט רגיל.' },
+
+  { id: 9, group: 'עוד אותיות', title: 'n ו־m', newKeys: ['n', 'm'], target: 14, legacy: [111],
+    desc: 'האצבע המורה הימנית יורדת לשורה התחתונה: אל n, למטה ושמאלה מ־j, ואל m, ממש מתחת ל־j.' },
+  { id: 10, title: 'c ו־w', newKeys: ['c', 'w'], target: 14, legacy: [111],
+    desc: 'האמה השמאלית יורדת מ־d אל c, והקמיצה השמאלית עולה מ־s אל w.' },
+  { id: 11, title: 'y ו־p', newKeys: ['y', 'p'], target: 15, legacy: [111],
+    desc: 'האצבע המורה הימנית נמתחת למעלה ושמאלה אל y, והזרת הימנית עולה מ־; אל p.' },
+  { id: 12, title: 'חזרה: רוב האותיות', newKeys: [], review: true, target: 15, legacy: [111],
+    desc: 'כל מה שלמדתם עד עכשיו. עם האותיות האלה אפשר להקליד כמעט כל מילה נפוצה באנגלית.' },
+
+  { id: 13, group: 'האותיות האחרונות', title: 'v ו־b', newKeys: ['v', 'b'], target: 15, legacy: [111],
+    desc: 'האצבע המורה השמאלית יורדת מ־f אל v, ונמתחת למטה וימינה אל b.' },
+  { id: 14, title: 'x q z', newKeys: ['x', 'q', 'z'], target: 15, legacy: [111],
+    desc: 'שלוש האותיות הנדירות: הקמיצה השמאלית יורדת מ־s אל x, והזרת השמאלית עולה מ־a אל q ויורדת אל z.' },
+  { id: 15, title: 'חזרה: כל האותיות', newKeys: [], review: true, target: 16, legacy: [111], milestone: 'letters',
+    desc: 'כל 26 האותיות האנגליות. עכשיו אתם מכירים את כל האותיות במקלדת!' },
+
+  { id: 16, group: 'אותיות גדולות, פיסוק ומספרים', title: 'אותיות גדולות (Shift)', newKeys: [], type: 'caps', target: 14, legacy: [112],
+    desc: 'לאות גדולה לוחצים על Shift ביד הנגדית: אות של יד שמאל (כמו A) עם Shift ימני, ואות של יד ימין (כמו J) עם Shift שמאלי.' },
+  { id: 17, title: 'נקודה ופסיק', newKeys: ['.', ','], type: 'punct', target: 16, legacy: [113],
+    desc: 'בפריסה האנגלית הפסיק נמצא על מקש , (האמה הימנית) והנקודה על מקש . (הקמיצה הימנית). אחרי פסיק ונקודה בא רווח.' },
+  { id: 18, title: 'סימן שאלה וסימן קריאה', newKeys: ['?', '!'], type: 'shift', target: 15,
+    desc: 'הכלל: Shift ביד הנגדית. סימן שאלה הוא Shift עם מקש / (זרת ימין), ולכן מחזיקים את Shift השמאלי. סימן קריאה הוא Shift עם הספרה 1 (זרת שמאל), ולכן מחזיקים את Shift הימני.' },
+  { id: 19, title: 'גרש, מירכאות ומקף', newKeys: ["'", '"', '-'], type: 'marks', target: 14,
+    desc: 'הגרש (\') נמצא ליד ; בזרת הימנית, ובאנגלית הוא חלק ממילים נפוצות: don\'t, it\'s, I\'m. המירכאות (") הן Shift שמאלי עם אותו מקש. המקף (-) נמצא בזרת הימנית, ליד הספרה 0, במילים כמו well-known.' },
+  { id: 20, title: 'מספרים: יד שמאל', newKeys: ['1', '2', '3', '4', '5'], type: 'numbers', target: 12, legacy: [116],
+    desc: 'שורת המספרים ביד שמאל: הזרת על 1, הקמיצה על 2, האמה על 3 והאצבע המורה על 4 ועל 5. כל אצבע עולה שתי שורות מעל מקומה וחוזרת לשורת הבית.' },
+  { id: 21, title: 'מספרים: יד ימין', newKeys: ['6', '7', '8', '9', '0'], type: 'numbers', target: 12, legacy: [116],
+    desc: 'ביד ימין: האצבע המורה על 6 ועל 7, האמה על 8, הקמיצה על 9 והזרת על 0. בסוף השיעור מספרים משתי הידיים יחד.' },
+
+  { id: 22, group: 'הקלדה אמיתית', title: 'מילים נפוצות', newKeys: [], type: 'words', target: 20, free: true, legacy: [114],
+    desc: 'המילים השכיחות ביותר באנגלית. ככל שתקלידו אותן יותר, כך כל מילה תהפוך לתנועה אחת רציפה במקום רצף של אותיות. בשיעור הזה ההקלדה ממשיכה גם אחרי טעות, כמו בהקלדה אמיתית: שימו לב לטעויות ותקנו אותן עם Backspace.' },
+  { id: 23, title: 'משפטים', newKeys: [], type: 'sentences', target: 20, free: true, legacy: [115],
+    desc: 'משפטים שלמים באנגלית עם אותיות גדולות, רווחים ופיסוק, כמו הקלדה אמיתית. בשיעור הזה ההקלדה ממשיכה גם אחרי טעות, כמו בהקלדה אמיתית: שימו לב לטעויות ותקנו אותן עם Backspace.' },
+  { id: 24, title: 'ציטוטים', newKeys: [], type: 'quotes', target: 20, free: true,
+    desc: 'משפטים מפורסמים באנגלית, עם פיסוק מלא. בשיעור הזה ההקלדה ממשיכה גם אחרי טעות, כמו בהקלדה אמיתית: שימו לב לטעויות ותקנו אותן עם Backspace.' },
 ];
-EN_LESSONS.forEach((l, i) => { if (!l.group) l.group = EN_LESSONS[i - 1].group; l.pid = 100 + l.id; });
-LESSONS.forEach(l => { l.pid = l.id; });
+
+// Extra real words for the first lessons, which can't use the common-word list yet.
+// The lines can be typed with the keys taught up to lessons 2, 3, 5, 6 and 7; the last two
+// lines give the rare letters x q z enough real words.
+const EN_LESSON_WORDS = [...new Set(`
+a as ad add adds all ask asks dad dads fad fall falls flask lad lads lass sad salad salads alas salsa
+had has half hall halls shall glad glass gas flash flag flags dash hash slash lash sash gala lag
+is he she if see did his like life feel said side idea kid kids deal asked high ahead safe lie less age sell lead fish fell
+sea hide sake liked field held file fake fill heads desk failed sees shake lake dig hill eggs legal glasses headed aside
+edge fail egg sale seek skills fed self seal fields ease hills hid dishes shell aid heal slide sail eagle skill ideal dish
+shield seed silk heels fled sigh skies leaf sells seeds shade shelf lease heel fade hike sage
+are here her us sure girl hear real used use guess hard far afraid dear read free full red hair air figure dark ride fair
+fear area agree dress share laugh judge huge rules risk guard herself earlier fresh raise large rule due leader dressed
+easier usual issue sugar harder ears rush higher rise useless regular desire rare grade hire hug failure useful guide
+argue degree fuel grass relief shared fridge rage laughed larger harsh rear ladder deer
+the to it that of this for do so just there get go right out at oh got good let look take or our tell too little should
+off these first still their other after talk thought great those last told does father old lot hello house through left
+three together hold door also took start looks ago lost true heart later sit eat late forget its shut hit four set
+daughter least hurt fight rest though started sister goes hours truth gets trust either tried outside light dog order hot
+lose sort hour serious earth fast street till others rather felt looked date straight takes future road feet state tired
+hotel talked floor letter short horse radio gold eight star offer list tea soul tough third seat art joke store south tree
+gift lots shoes foot further fit stage taste starts sold hole treat roll itself flight dogs rose hat stars faster folks
+east ghost tight stories health trial loud sight greatest older teeth target oil shirt guest heat lift total
+quick quiet quite question queen quarter equal square zero zoo zone size prize lazy crazy freeze frozen dozen amazing
+breeze puzzle jazz quiz box fox six mix fix next text taxi extra exam example relax wax expect explain excited
+`.trim().split(/\s+/))];
+
+const EN_ADAPTIVE_ORDER = ['e', 'o', 't', 'a', 'i', 'n', 'h', 's', 'r', 'l', 'u', 'd', 'y', 'w', 'm', 'g', 'c', 'f', 'b', 'p', 'k', 'v', 'j', 'x', 'z', 'q'];
+
+const EN_SHIFT_PHRASES = [
+  'How are you?', 'Where is my book?', 'What time is it?', 'Are you ready?', 'Can you help me?', 'Why not?', 'Who is there?',
+  'Is it far?', 'Really?', 'Are you sure?', 'Well done!', 'Good luck!', 'Thank you!', 'Happy birthday!', 'Look out!',
+  'Great job!', 'Welcome home!', 'What a day!', 'Nice to meet you!', 'See you soon!',
+];
+
+const EN_MARK_WORDS = [
+  "don't", "it's", "I'm", "you're", "can't", "we'll", "that's", "let's", "isn't", "didn't", "she's", "they're", "won't",
+  "I've", "Sam's", '"yes"', '"no"', '"hello"', '"stop"', '"please"',
+  'well-known', 'long-term', 'self-made', 'twenty-one', 'mother-in-law', 'up-to-date', 'part-time', 'warm-up', 'follow-up',
+];
+
+EN_SENTENCES.push(
+  'Please close the door when you leave the room.',
+  'We had pancakes and fresh fruit for breakfast.',
+  'The library is a quiet place to read and think.',
+  'Do you know what time the movie starts?',
+  'He forgot his keys at home again this morning.',
+  'Our neighbors invited us over for dinner on Friday.',
+  'Rain fell all night, and the streets were wet.',
+  'Typing with ten fingers saves a lot of time.',
+  'Where did you put the new box of pencils?',
+  'The birds were singing in the tree by the window.',
+  'After the storm, a bright rainbow filled the sky.',
+  'Try to keep a steady rhythm instead of rushing.',
+);
+
+EN_LESSONS.forEach((l, i) => { if (!l.group) l.group = EN_LESSONS[i - 1].group; l.pid = 300 + l.id; });
+LESSONS.forEach(l => { l.pid = 200 + l.id; });
+// Both courses, whichever language is being practised (badges count either one).
+const COURSES = { he: LESSONS.slice(), en: EN_LESSONS };
 const HE_SHIFT = { ...SHIFT_CHARS };
+
+// A lesson's best result: its own, or one carried over from the earlier course.
+function lessonProg(d, l) {
+  const own = d.lessons[l.pid];
+  if (own && own.stars) return own;
+  const old = (l.legacy || []).map(id => d.lessons[id]).filter(p => p && p.stars);
+  return old.length ? old.reduce((a, b) => (b.stars > a.stars ? b : a)) : own;
+}
 
 if (LANG === 'en') {
   const swap = (arr, items) => arr.splice(0, arr.length, ...items);
@@ -120,6 +210,12 @@ if (LANG === 'en') {
   swap(SENTENCES, EN_SENTENCES);
   swap(QUOTES, EN_QUOTES);
   swap(LESSONS, EN_LESSONS);
+  swap(LESSON_WORDS, EN_LESSON_WORDS);
+  swap(FINAL_PAIRS, []);
+  swap(PREFIXED, []);
+  swap(SHIFT_PHRASES, EN_SHIFT_PHRASES);
+  swap(MARK_WORDS, EN_MARK_WORDS);
+  swap(ADAPTIVE_ORDER, EN_ADAPTIVE_ORDER);
   for (const k of Object.keys(SHIFT_CHARS)) delete SHIFT_CHARS[k];
   for (const [code, [, shifted]] of Object.entries(EN_KEYS)) SHIFT_CHARS[code] = shifted;
 }

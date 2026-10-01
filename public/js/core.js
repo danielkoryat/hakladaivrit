@@ -29,6 +29,12 @@ const isTouch = matchMedia('(hover: none) and (pointer: coarse)').matches;
 const Prefs = {
   get hands() { return Store.get('hands', true); },
   set hands(v) { Store.set('hands', !!v); },
+  // Blind mode hides the on-screen keyboard in lessons, so the help fades out.
+  get blind() { return Store.get('blind', false); },
+  set blind(v) { Store.set('blind', !!v); },
+  // Eye stars: signals over the text that reward keeping the eyes on the screen.
+  get eyeStars() { return Store.get('eyeStars', true); },
+  set eyeStars(v) { Store.set('eyeStars', !!v); },
 };
 
 const ICON = {
@@ -47,6 +53,7 @@ const ICON = {
   flame: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3.5 4.5 5.2 4.5 9.5A4.5 4.5 0 0 1 12 16a4.5 4.5 0 0 1-4.5-4.5c0-1.6.6-2.8 1.5-3.8C9.3 10 10.3 11 11 11c0-3 1-6 1-9z"/><path d="M6 14.5a6 6 0 0 0 12 0c0 4.1-2.7 7.5-6 7.5s-6-3.4-6-7.5z" opacity=".55"/></svg>',
   upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.2A10 10 0 0 1 12 4c5 0 9 4.5 10 8a13 13 0 0 1-2.2 3.7M6.6 6.6C4.4 8 2.8 10.1 2 12c1 3.5 5 8 10 8a10 10 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
   sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>',
 };
 const starsHtml = (n, cls = '') =>
@@ -303,6 +310,25 @@ function handsButton(onToggle) {
   b.innerHTML = `${ICON.hand}<span>ידיים</span>`;
   b.title = 'הצגת ידיים וירטואליות על המקלדת';
   b.onclick = () => { Prefs.hands = !Prefs.hands; b.classList.toggle('active', Prefs.hands); onToggle(); };
+  return b;
+}
+
+// Blind mode: no on-screen keyboard, and the finger hint only appears after a hesitation.
+function blindButton(onToggle) {
+  const b = document.createElement('button');
+  b.className = 'cfg-btn' + (Prefs.blind ? ' active' : '');
+  b.innerHTML = `${ICON.eyeOff}<span>מצב עיוור</span>`;
+  b.title = 'הסתרת המקלדת שעל המסך. הרמז מופיע רק אם מתעכבים.';
+  b.onclick = () => { Prefs.blind = !Prefs.blind; b.classList.toggle('active', Prefs.blind); onToggle(); };
+  return b;
+}
+
+function eyeStarsButton(onToggle) {
+  const b = document.createElement('button');
+  b.className = 'cfg-btn' + (Prefs.eyeStars ? ' active' : '');
+  b.innerHTML = `${ICON.star}<span>כוכבי עיניים</span>`;
+  b.title = 'מדי פעם מופיע כוכב מעל הטקסט. לחיצה על Enter בזמן שהוא מופיע נותנת נקודות.';
+  b.onclick = () => { Prefs.eyeStars = !Prefs.eyeStars; b.classList.toggle('active', Prefs.eyeStars); onToggle(); };
   return b;
 }
 

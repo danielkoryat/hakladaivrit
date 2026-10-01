@@ -1,7 +1,7 @@
 # Hakladaivrit: Hebrew touch typing
 
 [hakladaivrit.com](https://hakladaivrit.com) is a free website that teaches touch typing in Hebrew,
-with English as an optional second language. It has a typing test, 16 graded lessons, adaptive
+with English as an optional second language. It has a typing test, 25 graded lessons, adaptive
 practice that targets each user's weak keys, a balloon typing game, a library of educational texts,
 practice on any text the user pastes, and a progress layer of XP, levels, streaks, badges and a
 leaderboard. An on-screen keyboard with animated hands shows which finger presses each key.
@@ -102,16 +102,42 @@ All typing activities (test, lessons, practice, texts) share one engine, `Typer`
 
 ## Lessons and exercise text
 
-The course follows the keyboard row by row: the home row, then the top row, then the bottom row,
-then punctuation, common words, full sentences and numbers. Each lesson adds a few new keys and
-may only use keys that have already been taught. Exercise text is generated fresh every time:
+The Hebrew course has 25 lessons and the English course 24. Both start with the home row
+(index and middle fingers, then ring fingers and pinkies, then the two inner keys) and then add
+two keys per lesson in order of how common the letters are in the language, not row by row.
+In Hebrew the index fingers' letters (ו ה א ר מ נ, about 40% of the letters in Hebrew text)
+come right after the home row, and the rare ט צ ז ס ץ come last. Each group ends with a review.
+Measured on a 50,000-word frequency list, the old row-by-row order made 28% of real text
+typeable halfway through the letters; this order makes 65%. After the letters come final
+forms (Hebrew), capitals (English), punctuation, `?` and `!` with the opposite-hand Shift,
+geresh, gershayim and hyphen, numbers for each hand, common words, Hebrew prefixes
+(ו ה ב ל מ ש כ), sentences and quotations.
 
-1. short drills of each new key (three in a row, then small groups of new keys)
-2. real words from the word list made only of allowed letters, preferring words that contain the
-   new keys
-3. when there are too few real words, pronounceable letter groups made of allowed letters. In
-   Hebrew, five letters have a special final form, and final forms only appear at the end of a
-   group, as in real writing.
+Exercise text for a letter lesson is generated fresh every time:
+
+1. drills of each new key: the key three times, then the key with the home key of the same
+   finger (`חוח` for ו), so the reach is practised out of the home row and back
+2. short letter groups mixing the new keys with those home keys
+3. real words that use only the keys taught so far, mostly words with the new keys and some
+   with earlier keys only, so older keys keep coming back. Words come from the common-word
+   list plus a list of extra words for the first lessons (`LESSON_WORDS`), so even lesson 1
+   has real words
+4. pronounceable letter groups where real words run out. In Hebrew, final letters only appear
+   at the end of a group, and כ מ נ פ צ never end one, as in real writing.
+
+A review lesson practises everything taught so far, with extra weight on the keys of its group.
+
+Blind mode (a button in every lesson) hides the on-screen keyboard and shows the finger hint
+only after a 1.5 second hesitation, so the help can fade out as the keys become familiar.
+
+Eye stars, from lesson 5 on: every 6 to 15 seconds of active typing, a star shows just above the
+text for 2.5 seconds, and pressing Enter while it shows catches it for 3 bonus XP. It follows
+Yechiam et al. (2003), where a secondary task with signals on the screen kept trainees from
+going back to looking at the keys. The results show how many stars were caught.
+
+Letter lessons stop on every mistake until the right key is pressed. The real-typing lessons
+(`free: true`: common words, prefixes, sentences, quotations) let the user type past a mistake
+and fix it with Backspace, as in real typing.
 
 A lesson earns stars:
 
@@ -121,8 +147,64 @@ A lesson earns stars:
 | 2 | accuracy of at least 92% |
 | 1 | the lesson was completed |
 
-Review lessons mix everything learned so far. The English course follows the same plan on the
-same physical keys, with a lesson for capital letters (Shift is pressed with the opposite hand).
+Lesson progress is stored by `pid`: 200 + id for Hebrew and 300 + id for English. The earlier
+16-lesson courses used 1 to 16 and 101 to 116; each new lesson lists in `legacy` the old
+lessons whose completion also counts for it, so nobody loses their progress.
+
+## Research behind the lessons
+
+The course design rests on published research on how typing skill is learned, on data about
+Hebrew and English text, and on what established courses do. Each source below was checked
+against the paper itself (abstract or full text), and each row says what the site does with it.
+
+### Studies
+
+| Finding | Source | How the site uses it |
+| --- | --- | --- |
+| Skilled typing works on two levels: an outer loop that handles whole words and an inner loop that turns each word into keystrokes. | Logan & Crump (2011), "Hierarchical control of cognitive processes: the case for skilled typewriting", *Psychology of Learning and Motivation* 54. [PDF](http://www.psy.vanderbilt.edu/faculty/logan/logan%20crump%20psych%20learn%20mot%202011.pdf) | Real words from the first lessons (`LESSON_WORDS`), so words become single units early. |
+| Typists can trade speed for accuracy, but most of the trade-off happens at the keystroke level, and pushing for speed costs many errors. | Yamaguchi, Crump & Logan (2013), "Speed–accuracy trade-off in skilled typewriting", *J. Exp. Psychology: Human Perception and Performance* 39(3). [doi:10.1037/a0030512](https://doi.org/10.1037/a0030512) | Accuracy first: letter lessons stop on every mistake, and 3 stars need 97% accuracy. |
+| Self-taught typists can be as fast as touch typists. The three predictors of speed are a consistent finger for each letter, preparing upcoming keystrokes, and little hand movement. | Feit, Weir & Oulasvirta (2016), "How we type: Movement strategies and performance in everyday typing", CHI 2016. [Project page](https://userinterfaces.aalto.fi/how-we-type/) | Each new key is drilled from the home key of its own finger (`חוח` for ו), and the hint names the finger for every key. |
+| Pairs of letters typed by different hands or fingers predict typing speed; overlapping key presses (rollover) are common among fast typists. | Dhakal, Feit, Kristensson & Oulasvirta (2018), "Observations on typing from 136 million keystrokes", CHI 2018. [doi:10.1145/3173574.3174220](https://doi.org/10.1145/3173574.3174220) | Drills pair keys of the two hands (כ with ח), and lessons move to real words, which are full of common letter pairs. |
+| Success in touch-typing training does not ensure its use afterwards: learners go back to looking at the keys because it gives better results in the moment. A secondary task with signals on the screen made looking at the screen worth more and helped trainees keep and maintain the skill. | Yechiam, Erev, Yehene & Gopher (2003), "Melioration and the transition from touch-typing training to everyday use", *Human Factors* 45(4). Technion. [doi:10.1518/hfes.45.4.671.27085](https://doi.org/10.1518/hfes.45.4.671.27085) | Eye stars: a short signal above the text that Enter catches for bonus XP. Blind mode hides the on-screen keyboard. |
+| Hiding the hands made skilled typists slower between keystrokes, and without on-screen echo they noticed their own errors less accurately. | Snyder, Logan & Yamaguchi (2015), "Watch what you type", *Attention, Perception & Psychophysics* 77(1). [doi:10.3758/s13414-014-0756-6](https://doi.org/10.3758/s13414-014-0756-6) | Visual help fades step by step instead of disappearing at once: blind mode still shows the hint after a hesitation, and typed text is always marked on screen. |
+| In a 14-lesson touch-typing program at the Hebrew University, typical students were *slower* at the end of the program; three months later, both groups had become significantly faster than before, with accuracy above 95%. | Weigelt Marom & Weintraub (2015), "The effect of a touch-typing program on keyboarding skills of higher education students with and without learning disabilities", *Research in Developmental Disabilities* 47. [doi:10.1016/j.ridd.2015.09.014](https://doi.org/10.1016/j.ridd.2015.09.014) | The lessons page and the guide tell learners to expect a temporary slowdown, and not to go back to looking at the keys. |
+| Postal workers learning to type learned fastest with one hour a day; longer or more intense sessions learned more slowly. | Baddeley & Longman (1978), "The influence of length and frequency of training session on the rate of learning to type", *Ergonomics* 21(8). [doi:10.1080/00140137808931764](https://doi.org/10.1080/00140137808931764) | The guide recommends short daily practice (15 to 20 minutes) rather than long sessions. |
+
+### Language data
+
+- **Letter frequency and word coverage.** Measured on the 50,000 most frequent words of
+  Hebrew and of English in [FrequencyWords](https://github.com/hermitdave/FrequencyWords)
+  (OpenSubtitles 2018), weighted by how often each word appears. Hebrew: י 11.1%, ו 9.5%,
+  ה 9.4%, א 8.6%, ל 7.5%, ת 6.1%, ר 4.8%, מ 4.6%, ש 4.6%, ב 4.4%, נ 3.7%, down to ף 0.2% and
+  ץ 0.1%. This sets the order of the lessons and of `ADAPTIVE_ORDER`.
+- **The effect of the order.** For each key order, the share of real text that can be typed
+  with the keys taught so far. Halfway through the letters, the earlier row-by-row Hebrew course
+  covered 28% of text and the current order covers 65%.
+- **Keyboard layout.** The course uses the standard Israeli layout, SI-1452, the default on
+  Windows. The optional 2018 "improved" layout (SI-1452-2), which moves punctuation and some
+  final letters, is rarely used. [Hebrew keyboard](https://en.wikipedia.org/wiki/Hebrew_keyboard)
+- **Spelling.** Practice text follows the Academy of the Hebrew Language's rules for spelling
+  without vowel marks (כתיב מלא), including its 2017 changes: שמיים, צוהריים, אימא, עוגייה,
+  מייד. [Academy rules](https://hebrew-academy.org.il/topic/hahlatot/missingvocalizationspelling/)
+
+### Courses compared
+
+- [typing.com](https://www.typing.com/curriculum/keyboarding) introduces common letters from all
+  rows early (J F, then U R K, then D E I, then C G N) instead of row by row.
+- [AgileFingers](https://agilefingers.com/he/kurs) (Hebrew) goes row by row, two keys per lesson,
+  with a review after each group. The site keeps that rhythm: two keys per lesson and a review
+  after each group.
+- [TypingStudy](https://www.typingstudy.com/he-hebrew-3/) (Hebrew) brings ר ו, ה צ and ב ת in
+  early.
+- [keybr](https://www.keybr.com/) opens letters one at a time by frequency, when the open ones
+  reach a target speed. The practice page's letter-unlocking mode follows this model.
+
+### Limits of the evidence
+
+No published study compares a frequency-based key order with a row-by-row order, in Hebrew or
+in any language. The order is supported indirectly: by the word-level studies above, by the
+coverage measurements, and by typing.com. The exact parameters are design choices, not research
+results: two keys per lesson, the star thresholds, and the timing, key and bonus of the eye stars.
 
 ## Analysis and personalised lessons
 
@@ -141,6 +223,13 @@ Each finding becomes a personalised lesson: drills on the weak or slow keys foll
 rich in them, a lesson for the weakest finger or row, or a lesson made of the problem words. The
 practice page keeps generating rounds that put extra weight on the current weak letters, and shows
 a heat map of accuracy on the keyboard.
+
+The practice page also has a letter-unlocking mode, after keybr. Letters open one at a time in
+order of frequency (`ADAPTIVE_ORDER`), starting with six. Each open letter keeps a moving average
+(weight 0.3 per round) of its time per key press and its accuracy. The next letter opens when
+every open letter has at least 15 presses, 95% accuracy and the target speed (20 to 40 WPM, the
+user's choice). Each round concentrates on the open letter furthest from the target, and rounds
+follow each other without a results screen. The state is kept in the browser per language.
 
 ## Progress over time
 

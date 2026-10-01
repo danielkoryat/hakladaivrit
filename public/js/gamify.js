@@ -12,16 +12,20 @@ const localDay = (d = new Date()) => d.toLocaleDateString('en-CA');
 const dayBefore = day => { const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() - 1); return localDay(d); };
 
 const bestWpm = d => d.history.filter(h => h.kind === 'test' && h.chars >= 50).reduce((m, h) => Math.max(m, h.wpm), 0);
-const lessonsDone = (d, from, to) => { for (let i = from; i <= to; i++) if (!(d.lessons[i] && d.lessons[i].stars)) return false; return true; };
+// Course badges count in either language: the first n lessons of the Hebrew or the English course.
+const courseDone = (d, upTo) => Object.values(COURSES).some(list => {
+  const end = typeof upTo === 'number' ? upTo : upTo === 'letters' ? list.findIndex(l => l.milestone === 'letters') + 1 : list.length;
+  return list.slice(0, end).every(l => lessonProg(d, l)?.stars);
+});
 const starsTotal = d => Object.values(d.lessons).reduce((s, l) => s + (l.stars || 0), 0);
 
 // id, emoji, title, how to earn it, test
 const BADGES = [
   ['first', '🎯', 'צעד ראשון', 'סיימו אימון ראשון', c => c.d.history.length + Object.keys(c.g.best).length > 0],
   ['first-test', '⏱️', 'מבחן ראשון', 'סיימו מבחן הקלדה', c => c.d.history.some(h => h.kind === 'test')],
-  ['home-row', '🏠', 'שורת הבית', 'סיימו את שיעורים 1 עד 4', c => lessonsDone(c.d, 1, 4)],
-  ['all-letters', '🔤', 'כל האותיות', 'סיימו את שיעורים 1 עד 12', c => lessonsDone(c.d, 1, 12)],
-  ['graduate', '🎓', 'בוגרי הקורס', 'סיימו את כל 16 השיעורים', c => lessonsDone(c.d, 1, 16)],
+  ['home-row', '🏠', 'שורת הבית', 'סיימו את ארבעת שיעורי שורת הבית', c => courseDone(c.d, 4)],
+  ['all-letters', '🔤', 'כל האותיות', 'סיימו את כל שיעורי האותיות, עד החזרה על כל האותיות', c => courseDone(c.d, 'letters')],
+  ['graduate', '🎓', 'בוגרי הקורס', 'סיימו את כל שיעורי הקורס', c => courseDone(c.d)],
   ['stars-24', '⭐', 'אספני כוכבים', 'אספו 24 כוכבים בשיעורים', c => starsTotal(c.d) >= 24],
   ['wpm-20', '🐢', '20 מילים לדקה', 'הגיעו ל־20 מילים לדקה במבחן', c => bestWpm(c.d) >= 20],
   ['wpm-40', '🐇', '40 מילים לדקה', 'הגיעו ל־40 מילים לדקה במבחן', c => bestWpm(c.d) >= 40],
@@ -82,7 +86,7 @@ const Gamify = {
     const correct = r.correct != null ? r.correct : Math.round((r.wpm * 5 * r.secs) / 60);
     switch (r.kind) {
       case 'test': return Math.round(correct / 8) + (r.acc >= 95 ? 10 : 0);
-      case 'lesson': return 15 + (r.stars || 1) * 10;
+      case 'lesson': return 15 + (r.stars || 1) * 10 + (r.eyes || 0) * 3;
       case 'custom': return 15 + Math.round(correct / 10);
       case 'text': return 10 + Math.round(correct / 6);
       case 'game': return Math.round(r.score / 15);
