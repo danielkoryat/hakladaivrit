@@ -457,6 +457,8 @@ async function api(request, env, route, cfg) {
 
 // ---------- Search engines: per-page titles, descriptions, sitemap ----------
 const SITE = 'הקלדה עיוורת';
+// Other names people search for the site by: the domain, in Latin letters and in Hebrew.
+const SITE_ALT_NAMES = ['Hakladaivrit', 'Haklada Ivrit', 'hakladaivrit.com', 'הקלדה עברית', 'הקלדה עיוורת בעברית'];
 const HOME_DESC = 'למדו להקליד בעברית מהר ומדויק בעשר אצבעות: מבחן מהירות, 25 שיעורים מדורגים ותרגול חכם, בחינם.';
 const PAGES = {
   '/': { title: 'הקלדה עיוורת בעברית | מבחן הקלדה, שיעורים ותרגול', desc: HOME_DESC, priority: '1.0', content: 'home' },
@@ -545,7 +547,7 @@ const attr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').repla
 
 function structuredData(meta, origin, body) {
   const home = `${origin}/`;
-  const org = { '@type': 'Organization', '@id': `${home}#organization`, name: SITE, url: home, logo: `${origin}/icon-512.png` };
+  const org = { '@type': 'Organization', '@id': `${home}#organization`, name: SITE, alternateName: SITE_ALT_NAMES, url: home, logo: `${origin}/icon-512.png` };
   const faq = body.faq && body.faq.length ? {
     '@type': 'FAQPage', '@id': `${origin}${meta.path === '/' ? '/' : meta.path}#faq`,
     mainEntity: body.faq.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
@@ -561,7 +563,7 @@ function structuredData(meta, origin, body) {
   const graph = [];
   if (meta.path === '/') {
     graph.push(
-      { '@type': 'WebSite', '@id': `${home}#website`, url: home, name: SITE, alternateName: 'הקלדה עיוורת בעברית', inLanguage: 'he', publisher: { '@id': org['@id'] } },
+      { '@type': 'WebSite', '@id': `${home}#website`, url: home, name: SITE, alternateName: SITE_ALT_NAMES, inLanguage: 'he', publisher: { '@id': org['@id'] } },
       org,
       {
         '@type': 'WebApplication', name: 'הקלדה עיוורת בעברית', url: home, inLanguage: 'he',
@@ -779,8 +781,13 @@ async function servePage(request, env, cfg, meta) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.hostname.startsWith('www.')) {
-      url.hostname = url.hostname.slice(4);
+    // One address per page: https, without www. Cloudflare's CF-Visitor header carries the
+    // scheme the visitor used; it is missing in local development, which stays on http.
+    let scheme = '';
+    try { scheme = JSON.parse(request.headers.get('cf-visitor') || '{}').scheme || ''; } catch { /* malformed header */ }
+    if (url.hostname.startsWith('www.') || scheme === 'http') {
+      url.hostname = url.hostname.replace(/^www\./, '');
+      url.protocol = 'https:';
       return Response.redirect(url.toString(), 301);
     }
     const cfg = settings(env);
