@@ -909,8 +909,8 @@ const SECURITY_HEADERS = {
 
 // ---------- Which site a visitor sees ----------
 // Visitors outside Israel who open a Hebrew page go to the same page on the English site, unless
-// they chose Hebrew (the "site" cookie, set by the language link in the footer) or their browser
-// asks for Hebrew. Search engines and link previews are never redirected, so they keep seeing
+// they chose Hebrew (the "site" cookie, set by the language link in the footer), their browser
+// asks for Hebrew, or they are signed in as an admin. Search engines and link previews are never redirected, so they keep seeing
 // both sites, and hreflang tells them the pages are translations of each other.
 const CRAWLER_UA = /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|whatsapp|telegram|discord|lighthouse|pagespeed|inspectiontool|headless/i;
 const cookie = (request, name) => (new RegExp(`(?:^|;\\s*)${name}=([^;]*)`).exec(request.headers.get('Cookie') || '') || [])[1];
@@ -923,7 +923,7 @@ function englishFor(meta) {
   return '/en';
 }
 
-function siteRedirect(request, url, meta) {
+async function siteRedirect(request, env, cfg, url, meta) {
   if (meta.lang !== 'he' || request.method !== 'GET') return null;
   const chosen = cookie(request, 'site');
   const ua = request.headers.get('User-Agent') || '';
@@ -931,6 +931,8 @@ function siteRedirect(request, url, meta) {
   if (chosen !== 'en') {
     const country = request.cf && request.cf.country;
     if (!country || country === 'IL' || /^(he|iw)\b/i.test(request.headers.get('Accept-Language') || '')) return null;
+    const user = await currentUser(request, env);
+    if (user && cfg.admins.has(String(user.email).toLowerCase())) return null;
   }
   return redirect(englishFor(meta) + url.search);
 }
@@ -996,7 +998,7 @@ export default {
       // The Hebrew page about learning English typing has no English twin.
       if (url.pathname === '/en/english') return Response.redirect(`${url.origin}/en`, 301);
       const meta = await pageMeta(env, url);
-      if (meta) return siteRedirect(request, url, meta) || await servePage(request, env, cfg, meta);
+      if (meta) return await siteRedirect(request, env, cfg, url, meta) || await servePage(request, env, cfg, meta);
       return env.ASSETS.fetch(request); // unknown pages get public/404.html with status 404
     } catch (e) {
       if (!e.status) console.error(e);

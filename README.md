@@ -312,8 +312,9 @@ and teaches only English typing.
 - **Search engines:** pages that exist on both sites link to each other with `hreflang`
   (`x-default` is English), and the sitemap lists both sites.
 - **Who sees which site:** a visitor outside Israel who opens a Hebrew page is redirected to the
-  same page on the English site, unless their browser asks for Hebrew or they chose Hebrew with
-  the language link in the footer (`?site=he` / `?site=en`, kept in a `site` cookie for a year).
+  same page on the English site, unless their browser asks for Hebrew, they are signed in as an
+  admin (`ADMIN_EMAILS`), or they chose Hebrew with the language link in the footer
+  (`?site=he` / `?site=en`, kept in a `site` cookie for a year).
   Search engines and link-preview bots are never redirected, so both sites stay indexed.
 
 ## Typing language
