@@ -335,7 +335,7 @@
   }
 
   // ---------- Lesson runner (regular and personalised lessons) ----------
-  function runLesson({ docTitle, meta, title, desc, focusKeys, dimTo, makeText, target, save, next, strict = true, eyeStars = false }) {
+  function runLesson({ docTitle, meta, title, desc, focusKeys, dimTo, makeText, target, save, next, strict = true, eyeStars = false, about = '' }) {
     document.title = docTitle;
     view.innerHTML = `
       <section class="page">
@@ -354,6 +354,7 @@
         </div>
         <div class="result" id="result" hidden></div>
         ${touchNote()}
+        ${about}
       </section>`;
 
     let kb = null, typer = null, hintTimer = 0;
@@ -489,6 +490,63 @@
     start();
   }
 
+  // ---------- What a lesson teaches ----------
+  // Shown under the exercise: the new keys and the fingers that press them, words from the
+  // lesson and the lessons around it. It also gives every lesson page its own text for search engines.
+  const ROW_OF_CODE = {};
+  KEY_ROWS.forEach((row, ri) => row.forEach(([code]) => { ROW_OF_CODE[code] = ri; }));
+
+  function lessonSamples(lesson, idx) {
+    switch (lesson.type) {
+      case 'words': return WORDS.slice(0, 30);
+      case 'sentences': return SENTENCES.slice(0, 6);
+      case 'quotes': return QUOTES.slice(0, 6).map(q => `${q.text} (${q.source})`);
+      case 'shift': return SHIFT_PHRASES.slice(0, 12);
+      case 'marks': return MARK_WORDS.slice(0, 16);
+      case 'finals': return FINAL_PAIRS.slice(0, 12);
+      case 'prefixes': return PREFIXED.slice(0, 24);
+      case undefined: {
+        const allowed = new Set(lessonLetters(idx));
+        const focus = lesson.review ? groupLetters(idx) : lesson.newKeys.filter(isLangLetter);
+        return LESSON_POOL.filter(w => [...w].every(c => allowed.has(c)) && [...w].some(c => focus.includes(c))).slice(0, 24);
+      }
+      default: return [];
+    }
+  }
+
+  function lessonAbout(lesson, idx) {
+    const keys = lesson.newKeys.filter(k => REVERSE[k]).map(k => {
+      const { code, shift } = REVERSE[k];
+      const enKey = `${shift ? 'Shift + ' : ''}${EN_KEYS[code][0].toUpperCase()}`;
+      return `<tr><td>${esc(k)}</td><td>${FINGER_NAMES[FINGER[code]]}</td><td>${ROW_NAMES[ROW_OF_CODE[code]]}</td>${LANG === 'en' ? '' : `<td dir="ltr">${esc(enKey)}</td>`}</tr>`;
+    }).join('');
+    const letters = lesson.type ? [] : lessonLetters(idx);
+    const samples = lessonSamples(lesson, idx);
+    const asList = ['sentences', 'quotes', 'shift'].includes(lesson.type);
+    const prev = LESSONS[idx - 1], next = LESSONS[idx + 1];
+    const link = l => `<a href="/lesson/${l.id}">שיעור ${l.id}: ${esc(l.title)}</a>`;
+    return `
+      <div class="page-info content">
+        <h2>מה לומדים בשיעור ${lesson.id}</h2>
+        <p>השיעור שייך לפרק "${esc(lesson.group)}" בקורס של ${LESSONS.length} שיעורים. לשלושה כוכבים צריך דיוק של 97% ומעלה ולפחות ${lesson.target} מילים לדקה.</p>
+        ${keys ? `<h3>המקשים החדשים</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>מקש</th><th>אצבע</th><th>שורה</th>${LANG === 'en' ? '' : '<th>המקש באנגלית</th>'}</tr></thead>
+          <tbody>${keys}</tbody>
+        </table></div>` : ''}
+        ${letters.length ? `<p>האותיות שלמדתם עד עכשיו (${letters.length}): ${letters.map(esc).join(' ')}</p>` : ''}
+        ${!samples.length ? '' : asList
+          ? `<h3>דוגמאות מהשיעור</h3><ul>${samples.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`
+          : `<h3>מילים מהשיעור</h3><p>${samples.map(esc).join(' · ')}</p>`}
+        <h3>השיעורים הסמוכים</h3>
+        <ul>
+          ${prev ? `<li>השיעור הקודם: ${link(prev)}</li>` : ''}
+          ${next ? `<li>השיעור הבא: ${link(next)}</li>` : ''}
+          <li><a href="/lessons">כל השיעורים</a> · <a href="/guide">מדריך הקלדה עיוורת</a> · <a href="/test">מבחן הקלדה</a></li>
+        </ul>
+      </div>`;
+  }
+
   function viewLesson(id) {
     const idx = LESSONS.findIndex(l => l.id === id);
     if (idx < 0) { navigate('/lessons'); return; }
@@ -509,6 +567,7 @@
       strict: !lesson.free,
       // Eye stars start after the home row, once there is something to look away from.
       eyeStars: idx >= 4,
+      about: lessonAbout(lesson, idx),
     });
   }
 

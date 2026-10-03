@@ -492,15 +492,44 @@ async function lessons(env, origin) {
   const res = await env.ASSETS.fetch(new Request(origin + '/js/data.js'));
   const src = await res.text();
   const unq = s => s.replace(/\\'/g, "'");
+  const field = (s, name) => { const f = new RegExp(`${name}:\\s*'((?:[^'\\\\]|\\\\.)*)'`).exec(s); return f ? unq(f[1]) : null; };
+  const strings = s => [...s.matchAll(/'((?:[^'\\]|\\.)*)'|"([^"]*)"/g)].map(x => (x[2] != null ? x[2] : unq(x[1])));
   const list = [];
   const re = /\{\s*id:\s*(\d+),([\s\S]*?)desc:\s*'((?:[^'\\]|\\.)*)'\s*\}/g;
   let m;
   while ((m = re.exec(src))) {
-    const t = /title:\s*'((?:[^'\\]|\\.)*)'/.exec(m[2]);
-    list.push({ id: Number(m[1]), title: t ? unq(t[1]) : `שיעור ${m[1]}`, desc: unq(m[3]) });
+    const keys = /newKeys:\s*\[([^\]]*)\]/.exec(m[2]);
+    const target = /target:\s*(\d+)/.exec(m[2]);
+    list.push({
+      id: Number(m[1]), title: field(m[2], 'title') || `שיעור ${m[1]}`, desc: unq(m[3]),
+      group: field(m[2], 'group') || (list.length ? list[list.length - 1].group : ''),
+      type: field(m[2], 'type'), newKeys: keys ? strings(keys[1]) : [], target: target ? Number(target[1]) : 0,
+    });
   }
   lessonCache = list;
+  keyCache = keyboard(src, strings);
   return list;
+}
+
+// Each key's finger, row and English label, from KEY_ROWS, SHIFT_CHARS and FINGER_NAMES in data.js.
+let keyCache = null;
+function keyboard(src, strings) {
+  const block = name => (new RegExp(`const ${name} = [\\[{]([\\s\\S]*?)\\n[\\]}];`).exec(src) || [, ''])[1];
+  const fingers = Object.fromEntries([...block('FINGER_NAMES').matchAll(/(\w+):\s*'([^']*)'/g)].map(x => [x[1], x[2]]));
+  const rows = ['שורת המספרים', 'השורה העליונה', 'שורת הבית', 'השורה התחתונה'];
+  const keys = {}, byCode = {};
+  block('KEY_ROWS').split(/\n\s*\],\s*\n\s*\[/).forEach((row, ri) => {
+    for (const k of row.matchAll(/\[\s*'(\w+)',\s*((?:'(?:[^'\\]|\\.)*'|"[^"]*"),\s*(?:'(?:[^'\\]|\\.)*'|"[^"]*")),\s*'(\w+)'/g)) {
+      const [he, en] = strings(k[2]);
+      byCode[k[1]] = { he, en: en || he, finger: fingers[k[3]], row: rows[ri] };
+      if (k[3] !== 'mod' && !keys[he]) keys[he] = { ...byCode[k[1]], label: (en || he).toUpperCase() };
+    }
+  });
+  for (const x of block('SHIFT_CHARS').matchAll(/(\w+):\s*('(?:[^'\\]|\\.)*'|"[^"]*")/g)) {
+    const ch = strings(x[2])[0], k = byCode[x[1]];
+    if (k && !keys[ch]) keys[ch] = { ...k, label: `Shift + ${k.en.toUpperCase()}` };
+  }
+  return keys;
 }
 
 let textsCache = null;
@@ -570,7 +599,7 @@ function structuredData(meta, origin, body) {
         applicationCategory: 'EducationalApplication', operatingSystem: 'Any', browserRequirements: 'דפדפן מודרני ומקלדת פיזית',
         isAccessibleForFree: true, description: HOME_DESC, image: `${origin}/og-image.png`,
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'ILS' },
-        featureList: ['מבחן מהירות הקלדה בעברית', '16 שיעורי הקלדה עיוורת מדורגים', 'ידיים וירטואליות שמראות איזו אצבע ללחוץ', 'תרגול חכם של מקשים חלשים', 'ניתוח דיוק ומהירות לכל מקש ואצבע'],
+        featureList: ['מבחן מהירות הקלדה בעברית', `${body.lessonCount} שיעורי הקלדה עיוורת מדורגים`, 'ידיים וירטואליות שמראות איזו אצבע ללחוץ', 'תרגול חכם של מקשים חלשים', 'ניתוח דיוק ומהירות לכל מקש ואצבע'],
       },
     );
   } else {
@@ -630,7 +659,8 @@ function faqFrom(html) {
 async function pageBody(env, url, meta) {
   if (meta.content) {
     const html = await fragment(env, url, meta.content);
-    return { html, ssr: meta.content, faq: faqFrom(html) };
+    const lessonCount = meta.path === '/' ? (await lessons(env, url.origin)).length : 0;
+    return { html, ssr: meta.content, faq: faqFrom(html), lessonCount };
   }
   if (meta.path === '/lessons') {
     const all = await lessons(env, url.origin);
@@ -653,20 +683,43 @@ ${Object.entries(data.categories).map(([k, name]) => `<h2>${esc(name)}</h2><ul>$
     return { html, ssr: meta.info };
   }
   if (meta.text) {
+    // The same "about this text" box the page shows under the typing area (texts.js, viewText).
     const t = meta.text;
+    const data = await textsData(env, url.origin);
+    const related = data.texts.filter(x => x.category === t.category && x !== t);
+    const words = t.text.split(' ').length;
+    const mins = Math.max(1, Math.round(words / 30));
     return {
       html: `<article class="page"><div class="lesson-head"><a class="back" href="/texts">כל הטקסטים</a>
 <div class="lesson-meta">${esc(meta.category)} · ${esc(t.level)}</div><h1>${esc(t.title)}</h1><p>${esc(t.intro)}</p></div>
-<p>${esc(t.text)}</p></article>`,
+<p>${esc(t.text)}</p>
+<div class="page-info content"><h2>על הטקסט</h2>
+<p>${words} מילים ו־${t.text.length} תווים. בקצב של 30 מילים לדקה מקלידים אותו ${mins === 1 ? 'בדקה אחת בערך' : `בערך ב־${mins} דקות`}.</p>
+${related.length ? `<h3>עוד טקסטים: ${esc(meta.category)}</h3><ul>${related.map(x => `<li><a href="/texts/${x.slug}">${esc(x.title)}</a> – ${esc(x.intro)}</li>`).join('')}</ul>` : ''}
+<p><a href="/texts">כל הטקסטים</a> · <a href="/texts/mine">תרגול על טקסט משלכם</a> · <a href="/test">מבחן הקלדה</a></p></div></article>`,
     };
   }
   if (meta.lesson) {
+    // The same "what this lesson teaches" box the page shows under the exercise (app.js, lessonAbout).
     const l = meta.lesson;
-    const nav = [l.id > 1 ? `<a href="/lesson/${l.id - 1}">לשיעור הקודם</a>` : '', l.id < meta.total ? `<a href="/lesson/${l.id + 1}">לשיעור הבא</a>` : '']
-      .filter(Boolean).join(' · ');
+    const all = await lessons(env, url.origin);
+    const idx = all.indexOf(l);
+    const keys = l.newKeys.filter(k => keyCache[k]).map(k => {
+      const info = keyCache[k];
+      return `<tr><td>${esc(k)}</td><td>${esc(info.finger)}</td><td>${esc(info.row)}</td><td dir="ltr">${esc(info.label)}</td></tr>`;
+    }).join('');
+    const letters = l.type ? [] : [...new Set(all.slice(0, idx + 1).filter(x => !x.type).flatMap(x => x.newKeys).filter(k => /^[א-ת]$/.test(k)))];
+    const link = x => `<a href="/lesson/${x.id}">שיעור ${x.id}: ${esc(x.title)}</a>`;
+    const prev = all[idx - 1], next = all[idx + 1];
     return {
       html: `<section class="page"><div class="lesson-head"><a class="back" href="/lessons">כל השיעורים</a>
-<div class="lesson-meta">שיעור ${l.id} מתוך ${meta.total}</div><h1>${esc(l.title)}</h1><p>${esc(l.desc)}</p></div><p>${nav}</p></section>`,
+<div class="lesson-meta">שיעור ${l.id} מתוך ${meta.total} · ${esc(l.group)}</div><h1>${esc(l.title)}</h1><p>${esc(l.desc)}</p></div>
+<div class="page-info content"><h2>מה לומדים בשיעור ${l.id}</h2>
+<p>השיעור שייך לפרק "${esc(l.group)}" בקורס של ${meta.total} שיעורים. לשלושה כוכבים צריך דיוק של 97% ומעלה ולפחות ${l.target} מילים לדקה.</p>
+${keys ? `<h3>המקשים החדשים</h3><div class="table-wrap"><table><thead><tr><th>מקש</th><th>אצבע</th><th>שורה</th><th>המקש באנגלית</th></tr></thead><tbody>${keys}</tbody></table></div>` : ''}
+${letters.length ? `<p>האותיות שלמדתם עד עכשיו (${letters.length}): ${letters.map(esc).join(' ')}</p>` : ''}
+<h3>השיעורים הסמוכים</h3><ul>${prev ? `<li>השיעור הקודם: ${link(prev)}</li>` : ''}${next ? `<li>השיעור הבא: ${link(next)}</li>` : ''}
+<li><a href="/lessons">כל השיעורים</a> · <a href="/guide">מדריך הקלדה עיוורת</a> · <a href="/test">מבחן הקלדה</a></li></ul></div></section>`,
     };
   }
   return { html: '' };

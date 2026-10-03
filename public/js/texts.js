@@ -153,12 +153,16 @@ async function viewText(slug) {
   const challenge = Share.challenge('מילים לדקה על הטקסט הזה');
   const idx = data.texts.indexOf(t);
   const next = data.texts[(idx + 1) % data.texts.length];
+  const cat = data.categories[t.category] || '';
+  const related = data.texts.filter(x => x.category === t.category && x !== t);
+  const words = t.text.split(' ').length;
+  const mins = Math.max(1, Math.round(words / 30));
 
   view.innerHTML = `
     <section class="page">
       <div class="lesson-head">
         <a class="back" href="/texts">→ כל הטקסטים</a>
-        <div class="lesson-meta">${esc(data.categories[t.category] || '')} · ${esc(t.level)}</div>
+        <div class="lesson-meta">${esc(cat)} · ${esc(t.level)}</div>
         <h1>${esc(t.title)}</h1>
         <p>${esc(t.intro)}</p>
       </div>
@@ -166,6 +170,13 @@ async function viewText(slug) {
       <div class="stage" id="stage"></div>
       <div class="result" id="result" hidden></div>
       ${touchNote()}
+      <div class="page-info content">
+        <h2>על הטקסט</h2>
+        <p>${words} מילים ו־${t.text.length} תווים. בקצב של 30 מילים לדקה מקלידים אותו ${mins === 1 ? 'בדקה אחת בערך' : `בערך ב־${mins} דקות`}.</p>
+        ${related.length ? `<h3>עוד טקסטים: ${esc(cat)}</h3>
+        <ul>${related.map(x => `<li><a href="/texts/${x.slug}">${esc(x.title)}</a> – ${esc(x.intro)}</li>`).join('')}</ul>` : ''}
+        <p><a href="/texts">כל הטקסטים</a> · <a href="/texts/mine">תרגול על טקסט משלכם</a> · <a href="/test">מבחן הקלדה</a></p>
+      </div>
     </section>`;
 
   function start() {
