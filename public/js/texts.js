@@ -5,7 +5,7 @@
 
 let textsPromise = null;
 function loadTexts() {
-  if (!textsPromise) textsPromise = fetch('/data/texts.json').then(r => r.json()).catch(() => ({ categories: {}, texts: [] }));
+  if (!textsPromise) textsPromise = fetch(tr('/data/texts.json', '/data/texts-en.json')).then(r => r.json()).catch(() => ({ categories: {}, texts: [] }));
   return textsPromise;
 }
 
@@ -49,7 +49,7 @@ const MyTexts = {
 
 // ---------- Library ----------
 async function viewTexts() {
-  document.title = 'טקסטים להקלדה: היסטוריה, מדע וטבע | הקלדה עיוורת';
+  document.title = tr('טקסטים להקלדה: היסטוריה, מדע וטבע | הקלדה עיוורת', 'Typing Practice Texts: History, Science and Nature | Hakladaivrit');
   const token = Page.token;
   const data = await loadTexts();
   if (token !== Page.token) return;
@@ -59,13 +59,13 @@ async function viewTexts() {
   view.innerHTML = `
     <section class="page">
       <div class="page-head">
-        <h1>טקסטים להקלדה</h1>
-        <p>מתרגלים הקלדה עיוורת ולומדים משהו חדש בדרך: היסטוריה, מדע, טבע והשפה העברית. או מתרגלים על חומר הלימוד שלכם.</p>
+        <h1>${tr('טקסטים להקלדה', 'Typing Practice Texts')}</h1>
+        <p>${tr('מתרגלים הקלדה עיוורת ולומדים משהו חדש בדרך: היסטוריה, מדע, טבע והשפה העברית. או מתרגלים על חומר הלימוד שלכם.', 'Practice touch typing and learn something new: history, science, nature and the Hebrew language. Or practice on your own study material.')}</p>
       </div>
-      <a class="mine-card" href="/texts/mine">
+      <a class="mine-card" href="${sitePath('/texts/mine')}">
         <span class="mine-emoji">📝</span>
-        <span><b>הטקסט שלי</b><br><span class="muted">מדביקים סיכום, מאמר או חומר למבחן, ומתרגלים עליו הקלדה עיוורת.</span></span>
-        <span class="btn primary">להתחיל</span>
+        <span><b>${tr('הטקסט שלי', 'My text')}</b><br><span class="muted">${tr('מדביקים סיכום, מאמר או חומר למבחן, ומתרגלים עליו הקלדה עיוורת.', 'Paste a summary, article or test material, and practice touch typing on it.')}</span></span>
+        <span class="btn primary">${tr('להתחיל', 'Get started')}</span>
       </a>
       <div class="config" id="filters"></div>
       <div class="texts-grid" id="grid"></div>
@@ -75,15 +75,15 @@ async function viewTexts() {
 
   const done = Gamify.state(Account.data).texts;
   function render() {
-    const f = [['all', 'הכל'], ...Object.entries(cats)];
+    const f = [['all', tr('הכל', 'All')], ...Object.entries(cats)];
     $('#filters').innerHTML = f.map(([k, n]) => `<button class="cfg-btn${k === filter ? ' active' : ''}" data-f="${k}">${n}</button>`).join('');
     const list = data.texts.filter(t => filter === 'all' || t.category === filter);
     $('#grid').innerHTML = list.map(t => `
-      <a class="text-card cat-${t.category}" href="/texts/${t.slug}">
-        <span class="tc-top"><span class="tc-cat">${esc(cats[t.category] || '')}</span>${done[t.slug] ? `<span class="tc-done">✓ <span class="num">${done[t.slug]}</span> מ/ד</span>` : ''}</span>
+      <a class="text-card cat-${t.category}" href="${sitePath(`/texts/${t.slug}`)}">
+        <span class="tc-top"><span class="tc-cat">${esc(cats[t.category] || '')}</span>${done[t.slug] ? `<span class="tc-done">✓ <span class="num">${done[t.slug]}</span> ${tr('מ/ד', 'wpm')}</span>` : ''}</span>
         <b class="tc-title">${esc(t.title)}</b>
         <span class="tc-intro">${esc(t.intro)}</span>
-        <span class="tc-meta"><span class="tag">${esc(t.level)}</span><span class="tag"><span class="num">${t.text.split(' ').length}</span> מילים</span></span>
+        <span class="tc-meta"><span class="tag">${esc(t.level)}</span><span class="tag"><span class="num">${t.text.split(' ').length}</span> ${tr('מילים', 'words')}</span></span>
       </a>`).join('');
   }
   $('#filters').addEventListener('click', e => {
@@ -130,14 +130,14 @@ function typingRun({ el, text, strict, onDone }) {
 function resultHtml(s, extra = '') {
   return `
     <div class="result-top">
-      ${statBox('מילים לדקה', Math.round(s.wpm), true)}
-      ${statBox('דיוק', Math.round(s.acc) + '%', true)}
+      ${statBox(tr('מילים לדקה', 'Words per minute'), Math.round(s.wpm), true)}
+      ${statBox(tr('דיוק', 'Accuracy'), Math.round(s.acc) + '%', true)}
     </div>
     <div class="result-grid">
-      ${statBox('תווים לדקה', Math.round(s.cpm))}
-      ${statBox('זמן', fmtTime(s.secs))}
-      ${statBox('טעויות', s.errors)}
-      ${statBox('תווים', s.correct)}
+      ${statBox(tr('תווים לדקה', 'Characters per minute'), Math.round(s.cpm))}
+      ${statBox(tr('זמן', 'Time'), fmtTime(s.secs))}
+      ${statBox(tr('טעויות', 'Errors'), s.errors)}
+      ${statBox(tr('תווים', 'Characters'), s.correct)}
     </div>
     ${extra}
     ${missedHtml(s.charStats)}`;
@@ -147,62 +147,63 @@ async function viewText(slug) {
   const token = Page.token;
   const data = await loadTexts();
   if (token !== Page.token) return;
-  const t = data.texts.find(x => x.slug === slug);
-  if (!t) { Page.navigate('/texts'); return; }
-  document.title = `${t.title}: טקסט להקלדה | הקלדה עיוורת`;
-  const challenge = Share.challenge('מילים לדקה על הטקסט הזה');
-  const idx = data.texts.indexOf(t);
+  const text = data.texts.find(x => x.slug === slug);
+  if (!text) { Page.navigate(sitePath('/texts')); return; }
+  document.title = tr(`${text.title}: טקסט להקלדה | הקלדה עיוורת`, `${text.title}: Typing Text | Hakladaivrit`);
+  const challenge = Share.challenge(tr('מילים לדקה על הטקסט הזה', 'words per minute on this text'));
+  const idx = data.texts.indexOf(text);
   const next = data.texts[(idx + 1) % data.texts.length];
-  const cat = data.categories[t.category] || '';
-  const related = data.texts.filter(x => x.category === t.category && x !== t);
-  const words = t.text.split(' ').length;
+  const cat = data.categories[text.category] || '';
+  const related = data.texts.filter(x => x.category === text.category && x !== text);
+  const words = text.text.split(' ').length;
   const mins = Math.max(1, Math.round(words / 30));
 
   view.innerHTML = `
     <section class="page">
       <div class="lesson-head">
-        <a class="back" href="/texts">→ כל הטקסטים</a>
-        <div class="lesson-meta">${esc(cat)} · ${esc(t.level)}</div>
-        <h1>${esc(t.title)}</h1>
-        <p>${esc(t.intro)}</p>
+        <a class="back" href="${sitePath('/texts')}">${tr('→ כל הטקסטים', '← All texts')}</a>
+        <div class="lesson-meta">${esc(cat)} · ${esc(text.level)}</div>
+        <h1>${esc(text.title)}</h1>
+        <p>${esc(text.intro)}</p>
       </div>
       ${challenge ? challenge.html : ''}
       <div class="stage" id="stage"></div>
       <div class="result" id="result" hidden></div>
       ${touchNote()}
       <div class="page-info content">
-        <h2>על הטקסט</h2>
-        <p>${words} מילים ו־${t.text.length} תווים. בקצב של 30 מילים לדקה מקלידים אותו ${mins === 1 ? 'בדקה אחת בערך' : `בערך ב־${mins} דקות`}.</p>
-        ${related.length ? `<h3>עוד טקסטים: ${esc(cat)}</h3>
-        <ul>${related.map(x => `<li><a href="/texts/${x.slug}">${esc(x.title)}</a> – ${esc(x.intro)}</li>`).join('')}</ul>` : ''}
-        <p><a href="/texts">כל הטקסטים</a> · <a href="/texts/mine">תרגול על טקסט משלכם</a> · <a href="/test">מבחן הקלדה</a></p>
+        <h2>${tr('על הטקסט', 'About this text')}</h2>
+        <p>${tr(`${words} מילים ו־${text.text.length} תווים. בקצב של 30 מילים לדקה מקלידים אותו ${mins === 1 ? 'בדקה אחת בערך' : `בערך ב־${mins} דקות`}.`,
+          `${words} words and ${text.text.length} characters. At 30 words per minute it takes about ${mins === 1 ? 'one minute' : `${mins} minutes`} to type.`)}</p>
+        ${related.length ? `<h3>${tr('עוד טקסטים', 'More texts')}: ${esc(cat)}</h3>
+        <ul>${related.map(x => `<li><a href="${sitePath(`/texts/${x.slug}`)}">${esc(x.title)}</a> – ${esc(x.intro)}</li>`).join('')}</ul>` : ''}
+        <p><a href="${sitePath('/texts')}">${tr('כל הטקסטים', 'All texts')}</a> · <a href="${sitePath('/texts/mine')}">${tr('תרגול על טקסט משלכם', 'Practice on your own text')}</a> · <a href="${sitePath('/test')}">${tr('מבחן הקלדה', 'Typing test')}</a></p>
       </div>
     </section>`;
 
   function start() {
     $('#result').hidden = true;
     $('#stage').hidden = false;
-    typingRun({ el: $('#stage'), text: t.text, strict: false, onDone: finish });
+    typingRun({ el: $('#stage'), text: text.text, strict: false, onDone: finish });
   }
   function finish(s, tp) {
-    const { reward } = Account.record(tp.report({ kind: 'text', mode: `text-${t.slug}`, label: t.title, textId: t.slug }));
+    const { reward } = Account.record(tp.report({ kind: 'text', mode: `text-${text.slug}`, label: text.title, textId: text.slug }));
     const beat = challenge && Math.round(s.wpm) > challenge.value;
     $('#stage').hidden = true;
     const r = $('#result');
     r.hidden = false;
     r.innerHTML = `
-      <h2 class="result-title">${beat ? 'ניצחתם את האתגר! 💪' : 'סיימתם את הטקסט'}</h2>
+      <h2 class="result-title">${beat ? tr('ניצחתם את האתגר! 💪', 'You beat the challenge! 💪') : tr('סיימתם את הטקסט', 'You finished the text')}</h2>
       ${resultHtml(s)}
       <div class="actions" id="r-actions">
-        <a class="btn primary" href="/texts/${next.slug}">לטקסט הבא ${ICON.next}</a>
-        <button class="btn" id="again">${ICON.restart} שוב</button>
+        <a class="btn primary" href="${sitePath(`/texts/${next.slug}`)}">${tr('לטקסט הבא', 'Next text')} ${ICON.next}</a>
+        <button class="btn" id="again">${ICON.restart} ${tr('שוב', 'Again')}</button>
       </div>`;
     $('#again').onclick = start;
     $('#r-actions').append(Share.button(() => ({
-      title: `הקלדתי את "${t.title}"`, big: Math.round(s.wpm), unit: 'מילים לדקה',
-      chips: [`דיוק ${Math.round(s.acc)}%`, data.categories[t.category]],
-      url: Share.challengeUrl(`/texts/${t.slug}`, Math.round(s.wpm)),
-      message: `הקלדתי את הטקסט "${t.title}" ב־${Math.round(s.wpm)} מילים לדקה ⌨️ תצליחו לנצח אותי?`,
+      title: tr(`הקלדתי את "${text.title}"`, `I typed "${text.title}"`), big: Math.round(s.wpm), unit: tr('מילים לדקה', 'words per minute'),
+      chips: [tr(`דיוק ${Math.round(s.acc)}%`, `Accuracy ${Math.round(s.acc)}%`), data.categories[text.category]],
+      url: Share.challengeUrl(`/texts/${text.slug}`, Math.round(s.wpm)),
+      message: tr(`הקלדתי את הטקסט "${text.title}" ב־${Math.round(s.wpm)} מילים לדקה ⌨️ תצליחו לנצח אותי?`, `I typed "${text.title}" at ${Math.round(s.wpm)} words per minute ⌨️ Can you beat me?`),
     })));
     Celebrate.show(reward);
   }
@@ -211,7 +212,7 @@ async function viewText(slug) {
 
 // ---------- My own text ----------
 function viewMyTexts() {
-  document.title = 'תרגול הקלדה על טקסט משלכם | הקלדה עיוורת';
+  document.title = tr('תרגול הקלדה על טקסט משלכם | הקלדה עיוורת', 'Type Your Own Text | Hakladaivrit');
   const params = new URLSearchParams(location.search);
   const open = params.get('id') && MyTexts.get(params.get('id'));
   if (open) { practiseMine(open); return; }
@@ -219,33 +220,33 @@ function viewMyTexts() {
   view.innerHTML = `
     <section class="page mine-page">
       <div class="lesson-head">
-        <a class="back" href="/texts">→ כל הטקסטים</a>
-        <h1>📝 הטקסט שלי</h1>
-        <p>מתכוננים למבחן? הדביקו כאן סיכום, מאמר או כל טקסט אחר, ותרגלו עליו הקלדה עיוורת. כך לומדים את החומר ומשפרים את ההקלדה בבת אחת. הטקסטים נשמרים רק בדפדפן שלכם.</p>
+        <a class="back" href="${sitePath('/texts')}">${tr('→ כל הטקסטים', '← All texts')}</a>
+        <h1>📝 ${tr('הטקסט שלי', 'My Text')}</h1>
+        <p>${tr('מתכוננים למבחן? הדביקו כאן סיכום, מאמר או כל טקסט אחר, ותרגלו עליו הקלדה עיוורת. כך לומדים את החומר ומשפרים את ההקלדה בבת אחת. הטקסטים נשמרים רק בדפדפן שלכם.', 'Preparing for a test? Paste a summary, article or any other text here, and practice touch typing on it. Learn the material and improve your typing at the same time. Your texts are saved only in your browser.')}</p>
       </div>
       <div class="panel">
-        <label class="field">שם (לא חובה)<input id="m-title" maxlength="60" placeholder="למשל: סיכום היסטוריה, פרק 3"></label>
-        <label class="field">הטקסט<textarea id="m-text" rows="8" dir="auto" placeholder="הדביקו כאן טקסט בעברית, באנגלית או בשתיהן..."></textarea></label>
+        <label class="field">${tr('שם (לא חובה)', 'Name (optional)')}<input id="m-title" maxlength="60" placeholder="${tr('למשל: סיכום היסטוריה, פרק 3', 'e.g.: History summary, chapter 3')}"></label>
+        <label class="field">${tr('הטקסט', 'Text')}<textarea id="m-text" rows="8" dir="auto" placeholder="${tr('הדביקו כאן טקסט בעברית, באנגלית או בשתיהן...', 'Paste text in Hebrew, English or both here...')}"></textarea></label>
         <div class="mine-row">
-          <label class="btn ghost upload">${ICON.upload} טעינת קובץ טקסט<input type="file" id="m-file" accept=".txt,text/plain" hidden></label>
+          <label class="btn ghost upload">${ICON.upload} ${tr('טעינת קובץ טקסט', 'Load text file')}<input type="file" id="m-file" accept=".txt,text/plain" hidden></label>
           <span class="muted small" id="m-count"></span>
-          <button class="btn primary" id="m-go">שמירה ותרגול</button>
+          <button class="btn primary" id="m-go">${tr('שמירה ותרגול', 'Save and practice')}</button>
         </div>
-        <p class="muted small">ניקוד, סימנים מיוחדים ורווחים כפולים מוסרים אוטומטית כדי שאפשר יהיה להקליד הכל. טקסט ארוך מתחלק לקטעים קצרים.</p>
+        <p class="muted small">${tr('ניקוד, סימנים מיוחדים ורווחים כפולים מוסרים אוטומטית כדי שאפשר יהיה להקליד הכל. טקסט ארוך מתחלק לקטעים קצרים.', 'Diacritics, special characters and extra spaces are removed automatically so you can type everything. Long text is split into short sections.')}</p>
       </div>
-      <h2 class="section-title">הטקסטים השמורים שלי</h2>
+      <h2 class="section-title">${tr('הטקסטים השמורים שלי', 'My saved texts')}</h2>
       <div id="m-list"></div>
     </section>`;
 
   const count = () => {
     const words = cleanForTyping($('#m-text').value).split(' ').filter(Boolean).length;
-    $('#m-count').textContent = words ? `${words} מילים · ${Math.max(1, sections(cleanForTyping($('#m-text').value)).length)} קטעים` : '';
+    $('#m-count').textContent = words ? `${words} ${tr('מילים', 'words')} · ${Math.max(1, sections(cleanForTyping($('#m-text').value)).length)} ${tr('קטעים', 'sections')}` : '';
   };
   $('#m-text').addEventListener('input', count);
   $('#m-file').addEventListener('change', e => {
     const f = e.target.files[0];
     if (!f) return;
-    if (f.size > 500000) { toast('הקובץ גדול מדי (עד 500KB)', true); return; }
+    if (f.size > 500000) { toast(tr('הקובץ גדול מדי (עד 500KB)', 'File too large (up to 500KB)'), true); return; }
     const reader = new FileReader();
     reader.onload = () => {
       $('#m-text').value = String(reader.result);
@@ -256,7 +257,7 @@ function viewMyTexts() {
   });
   $('#m-go').onclick = () => {
     const text = cleanForTyping($('#m-text').value).slice(0, 50000);
-    if (text.split(' ').length < 3) { toast('הדביקו טקסט של כמה מילים לפחות', true); return; }
+    if (text.split(' ').length < 3) { toast(tr('הדביקו טקסט של כמה מילים לפחות', 'Paste at least a few words'), true); return; }
     const t = MyTexts.add($('#m-title').value.trim().slice(0, 60), text);
     Page.navigate(`/texts/mine?id=${t.id}`);
   };
@@ -266,10 +267,10 @@ function viewMyTexts() {
     $('#m-list').innerHTML = all.length ? `<div class="mine-list">${all.map(t => {
       const parts = sections(t.text).length;
       return `<div class="mine-item">
-        <a href="/texts/mine?id=${t.id}"><b>${esc(t.title)}</b><span class="muted small">${t.text.split(' ').length} מילים · קטע ${Math.min(parts, (t.part || 0) + 1)} מתוך ${parts}</span></a>
-        <button class="icon-btn" data-del="${t.id}" title="מחיקה" aria-label="מחיקה">${ICON.trash}</button>
+        <a href="${sitePath(`/texts/mine?id=${t.id}`)}"><b>${esc(t.title)}</b><span class="muted small">${t.text.split(' ').length} ${tr('מילים', 'words')} · ${tr('קטע', 'Section')} ${Math.min(parts, (t.part || 0) + 1)} ${tr('מתוך', 'of')} ${parts}</span></a>
+        <button class="icon-btn" data-del="${t.id}" title="${tr('מחיקה', 'Delete')}" aria-label="${tr('מחיקה', 'Delete')}">${ICON.trash}</button>
       </div>`;
-    }).join('')}</div>` : '<p class="muted">עוד אין טקסטים שמורים.</p>';
+    }).join('')}</div>` : `<p class="muted">${tr('עוד אין טקסטים שמורים.', 'No saved texts yet.')}</p>`;
   }
   $('#m-list').addEventListener('click', e => {
     const b = e.target.closest('[data-del]');
@@ -278,19 +279,19 @@ function viewMyTexts() {
   list();
 }
 
-function practiseMine(t) {
-  const parts = sections(t.text);
-  let part = Math.min(t.part || 0, parts.length - 1);
+function practiseMine(txt) {
+  const parts = sections(txt.text);
+  let part = Math.min(txt.part || 0, parts.length - 1);
   let strict = Store.get('mineStrict', false);
-  document.title = `${t.title} | הקלדה עיוורת`;
+  document.title = `${txt.title} | ${tr('הקלדה עיוורת', 'Hakladaivrit')}`;
   view.innerHTML = `
     <section class="page">
       <div class="lesson-head">
-        <a class="back" href="/texts/mine">→ הטקסטים שלי</a>
-        <h1>${esc(t.title)}</h1>
+        <a class="back" href="${sitePath('/texts/mine')}">${tr('→ הטקסטים שלי', '← My texts')}</a>
+        <h1>${esc(txt.title)}</h1>
         <div class="mine-row">
           <span class="lesson-meta" id="p-part"></span>
-          <span class="config" style="margin:0"><button class="cfg-btn" id="p-strict">ללא טעויות</button></span>
+          <span class="config" style="margin:0"><button class="cfg-btn" id="p-strict">${tr('ללא טעויות', 'No errors')}</button></span>
         </div>
       </div>
       <div class="progress"><div class="bar" id="p-bar"></div></div>
@@ -298,7 +299,7 @@ function practiseMine(t) {
       <div class="result" id="result" hidden></div>
     </section>`;
   const renderHead = () => {
-    $('#p-part').textContent = `קטע ${part + 1} מתוך ${parts.length}`;
+    $('#p-part').textContent = `${tr('קטע', 'Section')} ${part + 1} ${tr('מתוך', 'of')} ${parts.length}`;
     $('#p-bar').style.width = (part / parts.length) * 100 + '%';
     $('#p-strict').classList.toggle('active', strict);
   };
@@ -311,19 +312,19 @@ function practiseMine(t) {
     typingRun({ el: $('#stage'), text: parts[part], strict, onDone: finish });
   }
   function finish(s, tp) {
-    const { reward } = Account.record(tp.report({ kind: 'text', mode: 'text-mine', label: t.title, textId: 'mine' }));
+    const { reward } = Account.record(tp.report({ kind: 'text', mode: 'text-mine', label: txt.title, textId: 'mine' }));
     const last = part >= parts.length - 1;
-    MyTexts.update(t.id, { part: last ? 0 : part + 1 });
+    MyTexts.update(txt.id, { part: last ? 0 : part + 1 });
     $('#stage').hidden = true;
     const r = $('#result');
     r.hidden = false;
     r.innerHTML = `
-      <h2 class="result-title">${last ? 'סיימתם את כל הטקסט! 🎉' : `קטע ${part + 1} מתוך ${parts.length} הושלם`}</h2>
+      <h2 class="result-title">${last ? tr('סיימתם את כל הטקסט! 🎉', 'You finished the whole text! 🎉') : tr(`קטע ${part + 1} מתוך ${parts.length} הושלם`, `Section ${part + 1} of ${parts.length} completed`)}</h2>
       ${resultHtml(s)}
       <div class="actions">
-        ${last ? '' : `<button class="btn primary" id="next-part">לקטע הבא (Enter) ${ICON.next}</button>`}
-        <button class="btn" id="again">${ICON.restart} שוב את הקטע</button>
-        <a class="btn ghost" href="/texts/mine">כל הטקסטים שלי</a>
+        ${last ? '' : `<button class="btn primary" id="next-part">${tr('לקטע הבא (Enter)', 'Next section (Enter)')} ${ICON.next}</button>`}
+        <button class="btn" id="again">${ICON.restart} ${tr('שוב את הקטע', 'Again')}</button>
+        <a class="btn ghost" href="${sitePath('/texts/mine')}">${tr('כל הטקסטים שלי', 'All my texts')}</a>
       </div>`;
     $('#again').onclick = start;
     if (!last) $('#next-part').onclick = () => { part++; start(); };

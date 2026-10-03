@@ -22,11 +22,16 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const isHebrew = c => /^[א-ת]$/.test(c);
 // A letter of the language being practised (Hebrew by default, English when switched).
 const isLangLetter = c => (LANG === 'en' ? /^[a-z]$/i.test(c) : isHebrew(c));
-const IN_LANG = LANG === 'en' ? 'באנגלית' : 'בעברית';
+const IN_LANG = SITE_LANG === 'en' ? '' : LANG === 'en' ? 'באנגלית' : 'בעברית';
 const fmtTime = secs => secs >= 3600
   ? `${Math.floor(secs / 3600)}:${String(Math.floor((secs % 3600) / 60)).padStart(2, '0')}h`
   : secs >= 60 ? `${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')}` : `${Math.round(secs)}s`;
-const fmtDate = ts => new Date(ts).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' });
+const fmtDate = ts => new Date(ts).toLocaleDateString(tr('he-IL', 'en-US'), { day: 'numeric', month: 'numeric' });
+
+// Addresses on this version of the site: the English site lives under /en, so there
+// sitePath('/test') is '/en/test'. Links in page HTML get the prefix automatically (app.js).
+const SITE_BASE = SITE_LANG === 'en' ? '/en' : '';
+const sitePath = p => (!SITE_BASE || /^\/en(\/|$|[?#])/.test(p) ? p : SITE_BASE + (p === '/' ? '' : p.replace(/^\/(?=[?#])/, '')));
 
 // Runs fn on window resize while el stays in the document.
 function onResizeWhile(el, fn) {

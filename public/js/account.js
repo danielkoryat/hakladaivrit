@@ -10,7 +10,30 @@ const Api = {
       body: body ? JSON.stringify(body) : undefined,
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw Object.assign(new Error(data.error || 'שגיאה בתקשורת עם השרת'), { status: res.status });
+    if (!res.ok) {
+      let msg = data.error || tr('שגיאה בתקשורת עם השרת', 'Error communicating with the server');
+      if (SITE_LANG === 'en' && data.error) {
+        const translations = {
+          'הבקשה גדולה מדי': 'Request too large',
+          'JSON לא תקין': 'Invalid JSON',
+          'נדרש JSON': 'JSON required',
+          'מקור לא מורשה': 'Unauthorized origin',
+          'התחברות עם Google אינה מופעלת': 'Google sign-in is not enabled',
+          'יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.': 'Too many attempts. Try again in a few minutes.',
+          'ההתחברות עם Google נכשלה. נסו שוב.': 'Google sign-in failed. Try again.',
+          'יש להתחבר': 'You must sign in',
+          'תוצאה לא תקינה': 'Invalid result',
+          'נתוני משחק לא תקינים': 'Invalid game data',
+          'כינוי: 2 עד 20 אותיות, ספרות או רווחים.': 'Nickname: 2 to 20 letters, digits or spaces.',
+          'משחק לא תקין': 'Invalid game',
+          'אין הרשאה': 'Permission denied',
+          'לא נמצא': 'Not found',
+          'שגיאת שרת': 'Server error',
+        };
+        msg = translations[data.error] || 'Something went wrong. Please try again.';
+      }
+      throw Object.assign(new Error(msg), { status: res.status });
+    }
     return data;
   },
 };
@@ -91,7 +114,7 @@ const Account = {
 
     if (this.user) {
       Api.req('POST', '/results', { ...entry, keyStats: r.keyStats, missedWords: missed, cleanWords: clean })
-        .catch(() => toast('לא הצלחנו לשמור את התוצאה בשרת', true));
+        .catch(() => toast(tr('לא הצלחנו לשמור את התוצאה בשרת', 'Failed to save the result'), true));
       this.saveGame();
     } else {
       Store.set('profile', d);
@@ -145,7 +168,7 @@ const Account = {
         await Api.req('POST', '/state', { game: this.data.game }).catch(() => {});
       }
       ['profile', 'keyStats', 'lessons', 'pb'].forEach(k => Store.remove(k));
-      toast('ההתקדמות מהדפדפן נשמרה בחשבון שלך');
+      toast(tr('ההתקדמות מהדפדפן נשמרה בחשבון שלך', 'Your progress from the browser was saved to your account'));
     } else {
       this.data = fromServer(await Api.req('GET', '/profile'));
     }
@@ -248,7 +271,7 @@ const Ads = {
       el.classList.add('filled');
       const slotId = ads && ads.slots[el.dataset.ad];
       if (slotId) {
-        el.innerHTML = '<div class="ad-label">פרסומת</div>';
+        el.innerHTML = `<div class="ad-label">${tr('פרסומת', 'Ad')}</div>`;
         const ins = document.createElement('ins');
         ins.className = 'adsbygoogle';
         ins.style.display = 'block';
@@ -256,7 +279,7 @@ const Ads = {
         el.append(ins);
         try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch { /* ad blocked */ }
       } else if (adsPreview) {
-        el.innerHTML = `<div class="ad-label">פרסומת</div><div class="ad-preview">מקום לפרסומת · ${esc(el.dataset.ad)}</div>`;
+        el.innerHTML = `<div class="ad-label">${tr('פרסומת', 'Ad')}</div><div class="ad-preview">${tr('מקום לפרסומת', 'Ad space')} · ${esc(el.dataset.ad)}</div>`;
       } else {
         el.remove();
       }
@@ -311,7 +334,7 @@ function analyze(d) {
     recentAcc: avg(recent, 'acc'),
   };
 
-  const problemWords = Object.entries(d.wordErrors).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([w]) => w);
+  const problemWords = Object.entries(d.wordErrors).filter(([w]) => [...w].some(isLangLetter)).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([w]) => w);
 
   return {
     keys, overall, weakKeys, slowKeys, strongKeys, fingers, weakestFinger, strongestFinger,
@@ -325,27 +348,27 @@ function customLessons(a) {
   const list = ks => ks.map(k => k.ch).join(' ');
   const out = [];
   if (a.weakKeys.length) {
-    out.push({ id: 'weak', title: 'המקשים החלשים שלך', keys: a.weakKeys.map(k => k.ch), target: base,
-      desc: `תרגול ממוקד במקשים שבהם הדיוק שלך הכי נמוך: ${list(a.weakKeys)}. האטו מעט והקפידו על האצבע הנכונה.` });
+    out.push({ id: 'weak', title: tr('המקשים החלשים שלך', 'Your weak keys'), keys: a.weakKeys.map(k => k.ch), target: base,
+      desc: tr(`תרגול ממוקד במקשים שבהם הדיוק שלך הכי נמוך: ${list(a.weakKeys)}. האטו מעט והקפידו על האצבע הנכונה.`, `Focused practice on the keys where your accuracy is lowest: ${list(a.weakKeys)}. Slow down and focus on the correct finger.`) });
   }
   if (a.slowKeys.length) {
-    out.push({ id: 'slow', title: 'המקשים האיטיים שלך', keys: a.slowKeys.map(k => k.ch), target: base,
-      desc: `במקשים ${list(a.slowKeys)} לוקח לך יותר זמן למצוא את המקום. חזרה עליהם תבנה זיכרון שריר.` });
+    out.push({ id: 'slow', title: tr('המקשים האיטיים שלך', 'Your slow keys'), keys: a.slowKeys.map(k => k.ch), target: base,
+      desc: tr(`במקשים ${list(a.slowKeys)} לוקח לך יותר זמן למצוא את המקום. חזרה עליהם תבנה זיכרון שריר.`, `On the keys ${list(a.slowKeys)}, it takes you longer to find the right position. Repeating them builds muscle memory.`) });
   }
   if (a.weakestFinger) {
     const f = a.weakestFinger;
-    out.push({ id: 'finger', title: `חיזוק ${f.name}`, keys: FINGER_CHARS[f.f].filter(c => isLangLetter(c) || c === '.' || c === ','), target: base,
-      desc: `ה${f.name} היא האצבע עם הדיוק הנמוך ביותר (${Math.round(f.acc * 100)}%). השיעור מתרגל רק את המקשים שלה.` });
+    out.push({ id: 'finger', title: tr(`חיזוק ${f.name}`, `Strengthen ${f.name}`), keys: FINGER_CHARS[f.f].filter(c => isLangLetter(c) || c === '.' || c === ','), target: base,
+      desc: tr(`ה${f.name} היא האצבע עם הדיוק הנמוך ביותר (${Math.round(f.acc * 100)}%). השיעור מתרגל רק את המקשים שלה.`, `Your ${f.name} has the lowest accuracy (${Math.round(f.acc * 100)}%). This lesson practices only its keys.`) });
   }
   if (a.weakestRow) {
     const r = a.weakestRow;
     const keys = Object.keys(ROW_OF).filter(c => ROW_OF[c] === r.r && (isLangLetter(c) || /\d/.test(c)));
-    out.push({ id: 'row', title: `חיזוק ${r.name}`, keys, target: base,
-      desc: `${r.name} היא השורה עם הדיוק הנמוך ביותר אצלך (${Math.round(r.acc * 100)}%).` });
+    out.push({ id: 'row', title: tr(`חיזוק ${r.name}`, `Strengthen ${r.name}`), keys, target: base,
+      desc: tr(`${r.name} היא השורה עם הדיוק הנמוך ביותר אצלך (${Math.round(r.acc * 100)}%).`, `Your ${r.name} has the lowest accuracy (${Math.round(r.acc * 100)}%).`) });
   }
   if (a.problemWords.length >= 3) {
-    out.push({ id: 'words', title: 'המילים הבעייתיות שלך', keys: [], words: a.problemWords, target: base,
-      desc: 'מילים שבהן טעית לאחרונה. כל פעם שתקלידו מילה בלי טעות, היא יורדת מהרשימה.' });
+    out.push({ id: 'words', title: tr('המילים הבעייתיות שלך', 'Your problem words'), keys: [], words: a.problemWords, target: base,
+      desc: tr('מילים שבהן טעית לאחרונה. כל פעם שתקלידו מילה בלי טעות, היא יורדת מהרשימה.', 'Words you recently made mistakes on. Each time you type a word correctly, it drops off the list.') });
   }
   return out;
 }

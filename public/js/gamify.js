@@ -4,8 +4,8 @@
 // and the celebrations shown when they change. State lives in Account.data.game.
 
 const RANKS = [
-  [1, '🐣', 'אפרוח'], [3, '🐢', 'צב'], [5, '🐇', 'ארנב'], [8, '🦊', 'שועל'],
-  [12, '🐆', 'צ׳יטה'], [16, '🦅', 'נשר'], [20, '🚀', 'טיל'], [30, '⚡', 'ברק'],
+  [1, '🐣', tr('אפרוח', 'Chick')], [3, '🐢', tr('צב', 'Turtle')], [5, '🐇', tr('ארנב', 'Rabbit')], [8, '🦊', tr('שועל', 'Fox')],
+  [12, '🐆', tr('צ׳יטה', 'Cheetah')], [16, '🦅', tr('נשר', 'Eagle')], [20, '🚀', tr('טיל', 'Rocket')], [30, '⚡', tr('ברק', 'Lightning')],
 ];
 
 const localDay = (d = new Date()) => d.toLocaleDateString('en-CA');
@@ -21,27 +21,27 @@ const starsTotal = d => Object.values(d.lessons).reduce((s, l) => s + (l.stars |
 
 // id, emoji, title, how to earn it, test
 const BADGES = [
-  ['first', '🎯', 'צעד ראשון', 'סיימו אימון ראשון', c => c.d.history.length + Object.keys(c.g.best).length > 0],
-  ['first-test', '⏱️', 'מבחן ראשון', 'סיימו מבחן הקלדה', c => c.d.history.some(h => h.kind === 'test')],
-  ['home-row', '🏠', 'שורת הבית', 'סיימו את ארבעת שיעורי שורת הבית', c => courseDone(c.d, 4)],
-  ['all-letters', '🔤', 'כל האותיות', 'סיימו את כל שיעורי האותיות, עד החזרה על כל האותיות', c => courseDone(c.d, 'letters')],
-  ['graduate', '🎓', 'בוגרי הקורס', 'סיימו את כל שיעורי הקורס', c => courseDone(c.d)],
-  ['stars-24', '⭐', 'אספני כוכבים', 'אספו 24 כוכבים בשיעורים', c => starsTotal(c.d) >= 24],
-  ['wpm-20', '🐢', '20 מילים לדקה', 'הגיעו ל־20 מילים לדקה במבחן', c => bestWpm(c.d) >= 20],
-  ['wpm-40', '🐇', '40 מילים לדקה', 'הגיעו ל־40 מילים לדקה במבחן', c => bestWpm(c.d) >= 40],
-  ['wpm-60', '🐆', '60 מילים לדקה', 'הגיעו ל־60 מילים לדקה במבחן', c => bestWpm(c.d) >= 60],
-  ['wpm-80', '🚀', '80 מילים לדקה', 'הגיעו ל־80 מילים לדקה במבחן', c => bestWpm(c.d) >= 80],
-  ['perfect', '💯', 'מושלם', 'מבחן של 20 מילים לפחות בלי אף טעות', c => c.d.history.some(h => h.kind === 'test' && h.chars >= 100 && h.errors === 0)],
-  ['goal', '✅', 'יעד יומי', 'עמדו ביעד היומי', c => Object.values(c.g.days).some(x => x.xp >= Gamify.goal())],
-  ['streak-3', '🔥', '3 ימים ברצף', 'התאמנו 3 ימים ברצף', c => c.streak >= 3],
-  ['streak-7', '🌟', 'שבוע ברצף', 'התאמנו 7 ימים ברצף', c => c.streak >= 7],
-  ['streak-30', '🏆', 'חודש ברצף', 'התאמנו 30 ימים ברצף', c => c.streak >= 30],
-  ['balloons-300', '🎈', 'מפוצצי בלונים', 'הגיעו ל־300 נקודות במשחק הבלונים', c => Math.max(0, ...Object.values(c.g.best)) >= 300],
-  ['balloons-1500', '🎊', 'אלופי הבלונים', 'הגיעו ל־1,500 נקודות במשחק הבלונים', c => Math.max(0, ...Object.values(c.g.best)) >= 1500],
-  ['historian', '📜', 'חוקרי היסטוריה', 'הקלידו 5 טקסטים היסטוריים', c => Object.keys(c.g.texts).filter(k => k.startsWith('history')).length >= 5],
-  ['reader', '📚', 'תולעי ספרים', 'הקלידו 10 טקסטים שונים מהספרייה', c => Object.keys(c.g.texts).filter(k => k !== 'mine').length >= 10],
-  ['own-text', '📝', 'לומדים חכם', 'תרגלו על טקסט משלכם', c => 'mine' in c.g.texts],
-  ['marathon', '🏃', 'מרתון', 'הקלידו 10,000 תווים נכונים', c => c.g.chars >= 10000],
+  ['first', '🎯', tr('צעד ראשון', 'First step'), tr('סיימו אימון ראשון', 'Complete your first practice'), c => c.d.history.length + Object.keys(c.g.best).length > 0],
+  ['first-test', '⏱️', tr('מבחן ראשון', 'First test'), tr('סיימו מבחן הקלדה', 'Complete a typing test'), c => c.d.history.some(h => h.kind === 'test')],
+  ['home-row', '🏠', tr('שורת הבית', 'Home row'), tr('סיימו את ארבעת שיעורי שורת הבית', 'Complete all four home row lessons'), c => courseDone(c.d, 4)],
+  ['all-letters', '🔤', tr('כל האותיות', 'All letters'), tr('סיימו את כל שיעורי האותיות, עד החזרה על כל האותיות', 'Complete all letter lessons through the full review'), c => courseDone(c.d, 'letters')],
+  ['graduate', '🎓', tr('בוגרי הקורס', 'Course graduate'), tr('סיימו את כל שיעורי הקורס', 'Complete all course lessons'), c => courseDone(c.d)],
+  ['stars-24', '⭐', tr('אספני כוכבים', 'Star collector'), tr('אספו 24 כוכבים בשיעורים', 'Earn 24 stars in lessons'), c => starsTotal(c.d) >= 24],
+  ['wpm-20', '🐢', tr('20 מילים לדקה', '20 WPM'), tr('הגיעו ל־20 מילים לדקה במבחן', 'Reach 20 words per minute on a test'), c => bestWpm(c.d) >= 20],
+  ['wpm-40', '🐇', tr('40 מילים לדקה', '40 WPM'), tr('הגיעו ל־40 מילים לדקה במבחן', 'Reach 40 words per minute on a test'), c => bestWpm(c.d) >= 40],
+  ['wpm-60', '🐆', tr('60 מילים לדקה', '60 WPM'), tr('הגיעו ל־60 מילים לדקה במבחן', 'Reach 60 words per minute on a test'), c => bestWpm(c.d) >= 60],
+  ['wpm-80', '🚀', tr('80 מילים לדקה', '80 WPM'), tr('הגיעו ל־80 מילים לדקה במבחן', 'Reach 80 words per minute on a test'), c => bestWpm(c.d) >= 80],
+  ['perfect', '💯', tr('מושלם', 'Perfect'), tr('מבחן של 20 מילים לפחות בלי אף טעות', 'A test of at least 20 words with zero errors'), c => c.d.history.some(h => h.kind === 'test' && h.chars >= 100 && h.errors === 0)],
+  ['goal', '✅', tr('יעד יומי', 'Daily goal'), tr('עמדו ביעד היומי', 'Meet the daily goal'), c => Object.values(c.g.days).some(x => x.xp >= Gamify.goal())],
+  ['streak-3', '🔥', tr('3 ימים ברצף', '3-day streak'), tr('התאמנו 3 ימים ברצף', 'Practice 3 days in a row'), c => c.streak >= 3],
+  ['streak-7', '🌟', tr('שבוע ברצף', 'Week-long streak'), tr('התאמנו 7 ימים ברצף', 'Practice 7 days in a row'), c => c.streak >= 7],
+  ['streak-30', '🏆', tr('חודש ברצף', 'Month-long streak'), tr('התאמנו 30 ימים ברצף', 'Practice 30 days in a row'), c => c.streak >= 30],
+  ['balloons-300', '🎈', tr('מפוצצי בלונים', 'Balloon popper'), tr('הגיעו ל־300 נקודות במשחק הבלונים', 'Reach 300 points in the balloon game'), c => Math.max(0, ...Object.values(c.g.best)) >= 300],
+  ['balloons-1500', '🎊', tr('אלופי הבלונים', 'Balloon champion'), tr('הגיעו ל־1,500 נקודות במשחק הבלונים', 'Reach 1,500 points in the balloon game'), c => Math.max(0, ...Object.values(c.g.best)) >= 1500],
+  ['historian', '📜', tr('חוקרי היסטוריה', 'Historian'), tr('הקלידו 5 טקסטים היסטוריים', 'Type 5 history texts'), c => Object.keys(c.g.texts).filter(k => k.startsWith('history')).length >= 5],
+  ['reader', '📚', tr('תולעי ספרים', 'Bookworm'), tr('הקלידו 10 טקסטים שונים מהספרייה', 'Type 10 different texts from the library'), c => Object.keys(c.g.texts).filter(k => k !== 'mine').length >= 10],
+  ['own-text', '📝', tr('לומדים חכם', 'Smart learner'), tr('תרגלו על טקסט משלכם', 'Practice on your own text'), c => 'mine' in c.g.texts],
+  ['marathon', '🏃', tr('מרתון', 'Marathon'), tr('הקלידו 10,000 תווים נכונים', 'Type 10,000 correct characters'), c => c.g.chars >= 10000],
 ];
 
 const Gamify = {
@@ -172,11 +172,11 @@ const Celebrate = {
   show(reward) {
     if (!reward) return;
     this.notice(`<b class="num">+${reward.xp}</b> XP`, 'xp');
-    reward.newBadges.forEach(([, emoji, title, how]) => this.notice(`<span class="n-emoji">${emoji}</span><span><b>תג חדש: ${esc(title)}</b><br>${esc(how)}</span>`, 'badge'));
-    if (reward.goalMet) this.notice('<span class="n-emoji">✅</span><span><b>עמדתם ביעד היומי!</b><br>נתראה מחר כדי לשמור על הרצף 🔥</span>', 'badge');
+    reward.newBadges.forEach(([, emoji, title, how]) => this.notice(`<span class="n-emoji">${emoji}</span><span><b>${tr('תג חדש', 'New badge')}: ${esc(title)}</b><br>${esc(how)}</span>`, 'badge'));
+    if (reward.goalMet) this.notice(`<span class="n-emoji">✅</span><span><b>${tr('עמדתם ביעד היומי!', 'You met the daily goal!')}</b><br>${tr('נתראה מחר כדי לשמור על הרצף 🔥', 'See you tomorrow to keep the streak 🔥')}</span>`, 'badge');
     if (reward.levelUp) {
       const { level, rank } = reward.after;
-      this.notice(`<span class="n-emoji">${rank.emoji}</span><span><b>עליתם לרמה ${level}!</b><br>הדרגה שלכם: ${esc(rank.name)}</span>`, 'level');
+      this.notice(`<span class="n-emoji">${rank.emoji}</span><span><b>${tr(`עליתם לרמה ${level}!`, `You reached level ${level}!`)}</b><br>${tr('הדרגה שלכם', 'Your rank')}: ${esc(rank.name)}</span>`, 'level');
     }
     if (reward.levelUp || reward.newBadges.length || reward.goalMet) this.confetti();
     Account.emit();

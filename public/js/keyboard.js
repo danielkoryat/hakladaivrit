@@ -21,7 +21,7 @@ Object.entries(HE_SHIFT).forEach(([code, ch]) => addKey(ch, code, true));
 Object.entries(EN_KEYS).forEach(([code, [lo, up]]) => { addKey(lo, code, false); addKey(up, code, true); });
 const isKeyFor = (e, ch) => { const k = KEY_OF[ch]; return !!k && k.code === e.code && k.shift === e.shiftKey; };
 
-const ROW_NAMES = ['שורת המספרים', 'השורה העליונה', 'שורת הבית', 'השורה התחתונה'];
+const ROW_NAMES = [tr('שורת המספרים', 'Number row'), tr('השורה העליונה', 'Top row'), tr('שורת הבית', 'Home row'), tr('השורה התחתונה', 'Bottom row')];
 const HOME_KEY = { lp: 'KeyA', lr: 'KeyS', lm: 'KeyD', li: 'KeyF', ri: 'KeyJ', rm: 'KeyK', rr: 'KeyL', rp: 'Semicolon' };
 const LETTER_FINGERS = Object.keys(HOME_KEY);
 // Characters each finger is responsible for.
@@ -300,7 +300,8 @@ function Hands(stage, kb, keys) {
 // ---------- On-screen keyboard ----------
 // The practised language's character is the big label, the other one sits in the corner.
 function keyLabels(he, en) {
-  const [main, corner] = LANG === 'en' && en ? [en, he === en ? '' : he] : [he, en];
+  if (he === 'רווח') he = tr('רווח', 'space');
+  const [main, corner] = LANG === 'en' && en ? [en, SITE_LANG === 'en' ? '' : (he === en ? '' : he)] : [he, en];
   return `<span class="k-he">${esc(main)}</span>${corner ? `<span class="k-en">${esc(corner)}</span>` : ''}`;
 }
 
@@ -374,16 +375,16 @@ function Keyboard(el, { colored = false, hands = false } = {}) {
         k.style.setProperty('--heat', Math.min(90, Math.round(rate * 400)) + '%');
         k.classList.add('heat');
         const ms = s[3] ? ` · ${Math.round(s[2] / s[3])}ms` : '';
-        k.title = `${ch}: דיוק ${Math.round((1 - rate) * 100)}% (${total} הקשות)${ms}`;
+        k.title = `${ch}: ${tr('דיוק', 'accuracy')} ${Math.round((1 - rate) * 100)}% (${total} ${tr('הקשות', 'taps')})${ms}`;
       });
     },
   };
 }
 
 const fingerLegend = () => `<div class="legend">
-  <span><i style="background:var(--f-p)"></i>זרת</span>
-  <span><i style="background:var(--f-r)"></i>קמיצה</span>
-  <span><i style="background:var(--f-m)"></i>אמה</span>
-  <span><i style="background:var(--f-i)"></i>אצבע מורה</span>
-  <span><i style="background:var(--f-t)"></i>אגודל</span>
+  <span><i style="background:var(--f-p)"></i>${tr('זרת', 'little')}</span>
+  <span><i style="background:var(--f-r)"></i>${tr('קמיצה', 'ring')}</span>
+  <span><i style="background:var(--f-m)"></i>${tr('אמה', 'middle')}</span>
+  <span><i style="background:var(--f-i)"></i>${tr('אצבע מורה', 'index')}</span>
+  <span><i style="background:var(--f-t)"></i>${tr('אגודל', 'thumb')}</span>
 </div>`;

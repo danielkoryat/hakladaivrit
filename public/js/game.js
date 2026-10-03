@@ -4,13 +4,13 @@
 // before they escape. Made for kids, fun for everyone.
 
 const GAME_MODES = LANG === 'en' ? {
-  home: { name: 'שורת הבית', desc: 'רק האותיות a s d f j k l', emoji: '🏠', letters: ['a', 's', 'd', 'f', 'j', 'k', 'l'], extra: ['g', 'h'] },
-  letters: { name: 'כל האותיות', desc: 'כל 26 האותיות האנגליות', emoji: '🔤' },
-  words: { name: 'מילים', desc: 'מילים קצרות באנגלית, אות אחרי אות', emoji: '📝' },
+  home: { name: tr('שורת הבית', 'Home row'), desc: tr('רק האותיות a s d f j k l', 'Only the letters a s d f j k l'), emoji: '🏠', letters: ['a', 's', 'd', 'f', 'j', 'k', 'l'], extra: ['g', 'h'] },
+  letters: { name: tr('כל האותיות', 'All letters'), desc: tr('כל 26 האותיות האנגליות', 'All 26 English letters'), emoji: '🔤' },
+  words: { name: tr('מילים', 'Words'), desc: tr('מילים קצרות באנגלית, אות אחרי אות', 'Short English words, one letter at a time'), emoji: '📝' },
 } : {
-  home: { name: 'שורת הבית', desc: 'רק האותיות ש ד ג כ ח ל ך ף', emoji: '🏠', letters: ['ש', 'ד', 'ג', 'כ', 'ח', 'ל', 'ך', 'ף'], extra: ['ע', 'י'] },
-  letters: { name: 'כל האותיות', desc: 'כל אותיות האלפבית, כולל סופיות', emoji: '🔤' },
-  words: { name: 'מילים', desc: 'מילים קצרות, אות אחרי אות', emoji: '📝' },
+  home: { name: tr('שורת הבית', 'Home row'), desc: tr('רק האותיות ש ד ג כ ח ל ך ף', 'Only the letters ש ד ג כ ח ל ך ף'), emoji: '🏠', letters: ['ש', 'ד', 'ג', 'כ', 'ח', 'ל', 'ך', 'ף'], extra: ['ע', 'י'] },
+  letters: { name: tr('כל האותיות', 'All letters'), desc: tr('כל אותיות האלפבית, כולל סופיות', 'All alphabet letters, including finals'), emoji: '🔤' },
+  words: { name: tr('מילים', 'Words'), desc: tr('מילים קצרות, אות אחרי אות', 'Short words, one letter at a time'), emoji: '📝' },
 };
 const ALL_LETTERS = [...(LANG === 'en' ? 'abcdefghijklmnopqrstuvwxyz' : 'אבגדהוזחטיכלמנסעפצקרשתךםןףץ')];
 const SHORT_WORDS = WORDS.filter(w => [...w].length >= 2 && [...w].length <= 4 && (LANG === 'en' ? /^[a-z]+$/ : /^[א-ת]+$/).test(w));
@@ -38,8 +38,8 @@ const Sound = {
 };
 
 function viewGame() {
-  document.title = 'משחק הקלדה לילדים: פוצצו את הבלונים | הקלדה עיוורת';
-  const challenge = Share.challenge('נקודות במשחק הבלונים');
+  document.title = tr('משחק הקלדה לילדים: פוצצו את הבלונים | הקלדה עיוורת', 'Typing Game for Kids: Pop the Balloons | Hakladaivrit');
+  const challenge = Share.challenge(tr('נקודות במשחק הבלונים', 'points in the balloon game'));
   let mode = Store.get('gameMode', 'home');
   const best = () => Gamify.state(Account.data).best[mode] || 0;
 
@@ -47,10 +47,10 @@ function viewGame() {
     <section class="page game-page">
       <div class="page-head game-head">
         <div>
-          <h1>🎈 משחק הבלונים</h1>
-          <p>הקלידו את האות שעל הבלון כדי לפוצץ אותו לפני שהוא עף. כל 10 בלונים המשחק נהיה מהיר יותר!</p>
+          <h1>🎈 ${tr('משחק הבלונים', 'Balloon Game')}</h1>
+          <p>${tr('הקלידו את האות שעל הבלון כדי לפוצץ אותו לפני שהוא עף. כל 10 בלונים המשחק נהיה מהיר יותר!', 'Type the letter on the balloon to pop it before it flies away. Every 10 balloons, the game gets faster!')}</p>
         </div>
-        <button class="icon-btn sound-btn" id="sound" title="צלילים"></button>
+        <button class="icon-btn sound-btn" id="sound" title="${tr('צלילים', 'Sounds')}"></button>
       </div>
       ${challenge ? challenge.html : ''}
       <div class="config game-modes" id="modes"></div>
@@ -95,10 +95,10 @@ function viewGame() {
     const s = st || { score: 0, hearts: 3, level: 1, combo: 0 };
     const mult = Math.min(5, 1 + Math.floor(s.combo / 5));
     $('#hud').innerHTML = `
-      <span class="hud-item">נקודות <b class="num">${s.score}</b></span>
-      <span class="hud-item">רמה <b class="num">${s.level}</b></span>
-      <span class="hud-item">${mult > 1 ? `קומבו <b class="num">×${mult}</b>` : `שיא <b class="num">${best()}</b>`}</span>
-      <span class="hud-item hearts" aria-label="${s.hearts} לבבות">${'❤️'.repeat(s.hearts)}${'🤍'.repeat(Math.max(0, 3 - s.hearts))}</span>`;
+      <span class="hud-item">${tr('נקודות', 'Score')} <b class="num">${s.score}</b></span>
+      <span class="hud-item">${tr('רמה', 'Level')} <b class="num">${s.level}</b></span>
+      <span class="hud-item">${mult > 1 ? `${tr('קומבו', 'Combo')} <b class="num">×${mult}</b>` : `${tr('שיא', 'Best')} <b class="num">${best()}</b>`}</span>
+      <span class="hud-item hearts" aria-label="${s.hearts} ${tr('לבבות', 'hearts')}">${'❤️'.repeat(s.hearts)}${'🤍'.repeat(Math.max(0, 3 - s.hearts))}</span>`;
   }
 
   function showStart() {
@@ -111,8 +111,8 @@ function viewGame() {
         <div class="big-emoji">${m.emoji}</div>
         <h2>${m.name}</h2>
         <p>${m.desc}</p>
-        <button class="btn primary big-btn" id="start">להתחיל! (רווח)</button>
-        <p class="muted small">Esc לעצירה</p>
+        <button class="btn primary big-btn" id="start">${tr('להתחיל! (רווח)', 'Start! (Space)')}</button>
+        <p class="muted small">${tr('Esc לעצירה', 'Esc to stop')}</p>
       </div>`;
     $('#start').onclick = start;
     st = null;
@@ -210,7 +210,7 @@ function viewGame() {
     area.querySelector('.miss-hint')?.remove();
     const el = document.createElement('div');
     el.className = 'miss-hint';
-    el.innerHTML = want ? `הקלדתם <b>${esc(ch)}</b> והאות הבאה היא <b>${esc(want)}</b>` : `הקלדתם <b>${esc(ch)}</b> ואין בלון כזה`;
+    el.innerHTML = want ? tr(`הקלדתם <b>${esc(ch)}</b> והאות הבאה היא <b>${esc(want)}</b>`, `You typed <b>${esc(ch)}</b> but the next letter is <b>${esc(want)}</b>`) : tr(`הקלדתם <b>${esc(ch)}</b> ואין בלון כזה`, `You typed <b>${esc(ch)}</b> but there's no such balloon`);
     area.append(el);
     setTimeout(() => el.remove(), 1100);
   }
@@ -233,7 +233,7 @@ function viewGame() {
     if (st.pops % 10 === 0) {
       st.level++;
       Sound.play('level');
-      Celebrate.notice(`<span class="n-emoji">🚀</span><span><b>רמה ${st.level}!</b><br>הבלונים מהירים יותר</span>`, 'level');
+      Celebrate.notice(`<span class="n-emoji">🚀</span><span><b>${tr('רמה', 'Level')} ${st.level}!</b><br>${tr('הבלונים מהירים יותר', 'The balloons are faster now')}</span>`, 'level');
     }
     hud();
   }
@@ -241,7 +241,7 @@ function viewGame() {
   function onKey(e) {
     if (e.key === 'Escape') {
       e.preventDefault();
-      if (st && st.running) { stop(); overlay.hidden = false; overlay.innerHTML = '<div class="overlay-card"><div class="big-emoji">⏸️</div><h2>הפסקה</h2><button class="btn primary big-btn" id="resume">להמשיך (רווח)</button></div>'; $('#resume').onclick = resume; }
+      if (st && st.running) { stop(); overlay.hidden = false; overlay.innerHTML = `<div class="overlay-card"><div class="big-emoji">⏸️</div><h2>${tr('הפסקה', 'Paused')}</h2><button class="btn primary big-btn" id="resume">${tr('להמשיך (רווח)', 'Resume (Space)')}</button></div>`; $('#resume').onclick = resume; }
       return;
     }
     if (!st || !st.running) {
@@ -291,26 +291,26 @@ function viewGame() {
     overlay.innerHTML = `
       <div class="overlay-card">
         <div class="big-emoji">${isBest && st.score > 0 ? '🏆' : '🎈'}</div>
-        <h2>${isBest && st.score > 0 ? 'שיא חדש!' : 'המשחק נגמר'}</h2>
-        ${beat ? '<p class="win">ניצחתם את האתגר! 💪</p>' : ''}
+        <h2>${isBest && st.score > 0 ? tr('שיא חדש!', 'New record!') : tr('המשחק נגמר', 'Game over')}</h2>
+        ${beat ? `<p class="win">${tr('ניצחתם את האתגר! 💪', 'You beat the challenge! 💪')}</p>` : ''}
         <div class="game-stats">
-          <div><span>נקודות</span><b class="num">${st.score}</b></div>
-          <div><span>בלונים</span><b class="num">${st.pops}</b></div>
-          <div><span>רמה</span><b class="num">${st.level}</b></div>
-          <div><span>דיוק</span><b class="num">${acc}%</b></div>
+          <div><span>${tr('נקודות', 'Score')}</span><b class="num">${st.score}</b></div>
+          <div><span>${tr('בלונים', 'Balloons')}</span><b class="num">${st.pops}</b></div>
+          <div><span>${tr('רמה', 'Level')}</span><b class="num">${st.level}</b></div>
+          <div><span>${tr('דיוק', 'Accuracy')}</span><b class="num">${acc}%</b></div>
         </div>
         <div class="actions center">
-          <button class="btn primary big-btn" id="again">עוד פעם! (רווח)</button>
+          <button class="btn primary big-btn" id="again">${tr('עוד פעם! (רווח)', 'Again! (Space)')}</button>
         </div>
         <div class="actions center" id="game-share"></div>
-        <p class="small"><a href="/leaderboard">לטבלת האלופים 🏆</a></p>
+        <p class="small"><a href="${sitePath('/leaderboard')}">${tr('לטבלת האלופים 🏆', 'Leaderboard 🏆')}</a></p>
       </div>`;
     $('#again').onclick = start;
     $('#game-share').append(Share.button(() => ({
-      title: `פוצצתי ${st.pops} בלונים!`, big: st.score, unit: 'נקודות במשחק הבלונים',
-      chips: [GAME_MODES[mode].name, `רמה ${st.level}`, `דיוק ${acc}%`],
+      title: tr(`פוצצתי ${st.pops} בלונים!`, `I popped ${st.pops} balloons!`), big: st.score, unit: tr('נקודות במשחק הבלונים', 'points in the balloon game'),
+      chips: [GAME_MODES[mode].name, `${tr('רמה', 'Level')} ${st.level}`, `${tr('דיוק', 'Accuracy')} ${acc}%`],
       url: Share.challengeUrl('/game', st.score, { m: mode }),
-      message: `צברתי ${st.score} נקודות במשחק הבלונים של הקלדה עיוורת 🎈 תצליחו לנצח אותי?`,
+      message: tr(`צברתי ${st.score} נקודות במשחק הבלונים של הקלדה עיוורת 🎈 תצליחו לנצח אותי?`, `I scored ${st.score} points in the Hakladaivrit balloon game 🎈 Can you beat me?`),
     })));
     Celebrate.show(reward);
     hud();

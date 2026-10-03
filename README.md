@@ -1,7 +1,8 @@
 # Hakladaivrit: Hebrew touch typing
 
 [hakladaivrit.com](https://hakladaivrit.com) is a free website that teaches touch typing in Hebrew,
-with English as an optional second language. It has a typing test, 25 graded lessons, adaptive
+with English as an optional second language. An English version of the whole site at
+[/en](https://hakladaivrit.com/en) teaches English typing to visitors outside Israel. It has a typing test, 25 graded lessons, adaptive
 practice that targets each user's weak keys, a balloon typing game, a library of educational texts,
 practice on any text the user pastes, and a progress layer of XP, levels, streaks, badges and a
 leaderboard. An on-screen keyboard with animated hands shows which finger presses each key.
@@ -35,6 +36,8 @@ page requests / JSON API  ────►  Worker (worker/index.js)
   For `/api/*` it reads and writes the database. Everything else (scripts, styles, images) is
   served directly from Cloudflare's static asset storage without running the Worker.
 - **Database:** Cloudflare D1, a SQLite database. The schema lives in `migrations/`.
+- **Two sites:** the Hebrew site at `/` and the English site at `/en`, from the same code. See
+  [Two sites](#two-sites-hebrew-and-english).
 - **Deploys:** every push to `main` triggers a GitHub Actions workflow. It runs the tests,
   applies any new database migrations, publishes the Worker, and notifies search engines about
   the site's pages through IndexNow.
@@ -291,9 +294,31 @@ sound, and pauses when the tab is hidden.
   Long texts are split into parts of about 45 words, ending at a sentence end when possible. These
   texts are stored only in the user's browser and are never sent to the server.
 
+## Two sites: Hebrew and English
+
+The English site lives under `/en` (`/en/test`, `/en/lesson/3`, `/en/texts/science-moon`…) and
+has every page of the Hebrew site except `/english`. It is written in English, runs left to right
+and teaches only English typing.
+
+- **One code base:** `data-en.js` sets `SITE_LANG` from the address and defines `tr(he, en)`,
+  which every script uses for its texts. On the English site the typing language is always
+  English and the Hebrew/English switch is hidden.
+- **Addresses:** `sitePath()` adds `/en` to addresses built in code, the router ignores the
+  prefix, and every `<a href="/…">` in the page gets it automatically. The Worker does the same
+  for the HTML it renders.
+- **English content:** the app shell is `public/en/index.html`, page texts are in
+  `public/content/en/`, the text library is `public/data/texts-en.json`, and the English lessons'
+  English text is `EN_LESSONS_EN` in `data-en.js`.
+- **Search engines:** pages that exist on both sites link to each other with `hreflang`
+  (`x-default` is English), and the sitemap lists both sites.
+- **Who sees which site:** a visitor outside Israel who opens a Hebrew page is redirected to the
+  same page on the English site, unless their browser asks for Hebrew or they chose Hebrew with
+  the language link in the footer (`?site=he` / `?site=en`, kept in a `site` cookie for a year).
+  Search engines and link-preview bots are never redirected, so both sites stay indexed.
+
 ## Typing language
 
-Hebrew is the default. A switch in the header changes the practised language to English. The
+Hebrew is the default on the Hebrew site. A switch in the header changes the practised language to English. The
 choice is saved in the browser and read once when the page loads, and switching reloads the page.
 Before any feature runs, `public/js/data-en.js` swaps the shared data (keyboard characters, word
 list, sentences, quotes and lessons), so the rest of the code works the same in both languages.
@@ -303,7 +328,8 @@ The two languages are tracked separately:
 
 - English lessons are stored under their own ids.
 - English test results use their own mode names, so they have their own personal bests.
-- The speed leaderboards count Hebrew tests only.
+- The speed leaderboards count Hebrew tests on the Hebrew site and English tests on the English
+  site.
 - XP, level and streak are shared by both languages.
 
 ## Accounts and data
@@ -369,8 +395,9 @@ test page show "can you beat it?" with the friend's score, and a message if the 
 | `wrangler.jsonc` | Cloudflare configuration: routes, database binding, settings |
 | `.github/workflows/deploy.yml` | tests, migrations, deploy and IndexNow on every push |
 | `public/index.html` | the app shell: header, footer, sign-in dialog, script order |
+| `public/en/index.html` | the English site's app shell |
 | `public/js/data.js` | keyboard layout, Hebrew lessons, word list, sentences, quotes |
-| `public/js/data-en.js` | typing language switch, US layout, English lessons, words, sentences, quotes |
+| `public/js/data-en.js` | site language and `t()`, typing language switch, US layout, English lessons, words, sentences, quotes |
 | `public/js/util.js` | small shared helpers and browser storage |
 | `public/js/keyboard.js` | key maps, on-screen keyboard, animated hands |
 | `public/js/text.js` | exercise text generation |

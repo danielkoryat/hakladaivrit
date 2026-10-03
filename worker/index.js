@@ -209,7 +209,8 @@ const BOTS = [
   { name: 'בוט טיל', emoji: '🚀', speed: 90, game: 2700, xp: 12500 },
 ];
 
-async function leaderboard(env, board, me) {
+// Speed boards count tests in one typing language: Hebrew on the Hebrew site, English on the English one.
+async function leaderboard(env, board, me, lang = 'he') {
   const week = Date.now() - 7 * 86400000;
   const cols = 'u.name AS name, s.nickname AS nickname, COALESCE(s.xp, 0) AS xp';
   let sql, bind = [];
@@ -224,7 +225,7 @@ async function leaderboard(env, board, me) {
   } else {
     sql = `SELECT r.user_id AS uid, ROUND(MAX(r.wpm)) AS value, ${cols} FROM results r JOIN users u ON u.id = r.user_id
            LEFT JOIN user_state s ON s.user_id = r.user_id
-           WHERE r.kind = 'test' AND r.mode NOT LIKE 'en-%' AND r.chars >= 50 AND r.acc >= 90 AND r.at >= ?1 AND COALESCE(s.show_on_board, 1) = 1
+           WHERE r.kind = 'test' AND r.mode ${lang === 'en' ? '' : 'NOT '}LIKE 'en-%' AND r.chars >= 50 AND r.acc >= 90 AND r.at >= ?1 AND COALESCE(s.show_on_board, 1) = 1
            GROUP BY r.user_id ORDER BY value DESC LIMIT 25`;
     bind = [board === 'all' ? 0 : week];
   }
@@ -349,7 +350,8 @@ async function api(request, env, route, cfg) {
 
   if (route === '/leaderboard' && method === 'GET') {
     const board = ['week', 'all', 'game', 'xp'].includes(url.searchParams.get('board')) ? url.searchParams.get('board') : 'week';
-    return json(200, await leaderboard(env, board, await currentUser(request, env)));
+    const lang = url.searchParams.get('lang') === 'en' ? 'en' : 'he';
+    return json(200, await leaderboard(env, board, await currentUser(request, env), lang));
   }
 
   const user = await currentUser(request, env);
@@ -485,87 +487,142 @@ const PAGES = {
   '/admin': { title: 'לוח ניהול | הקלדה עיוורת', desc: HOME_DESC, noindex: true },
 };
 
-// Lesson titles and descriptions come from public/js/data.js, the same file the site uses.
-let lessonCache = null;
-async function lessons(env, origin) {
-  if (lessonCache) return lessonCache;
-  const res = await env.ASSETS.fetch(new Request(origin + '/js/data.js'));
-  const src = await res.text();
-  const unq = s => s.replace(/\\'/g, "'");
-  const field = (s, name) => { const f = new RegExp(`${name}:\\s*'((?:[^'\\\\]|\\\\.)*)'`).exec(s); return f ? unq(f[1]) : null; };
-  const strings = s => [...s.matchAll(/'((?:[^'\\]|\\.)*)'|"([^"]*)"/g)].map(x => (x[2] != null ? x[2] : unq(x[1])));
+// The English site (/en): the same pages, in English, teaching English typing. The keys are
+// the addresses without /en. Pages that exist on both sites point to each other (hreflang).
+const SITE_EN = 'Hakladaivrit';
+const HOME_DESC_EN = 'Learn to type fast and accurately with all ten fingers: a typing speed test, 24 step-by-step lessons and smart practice, free.';
+const PAGES_EN = {
+  '/': { title: 'Free Touch Typing Lessons and Typing Test | Hakladaivrit', desc: HOME_DESC_EN, priority: '1.0', content: 'home' },
+  '/guide': { title: 'Touch Typing Guide: Finger Placement, Home Row and a Practice Plan | Hakladaivrit', priority: '0.9', crumb: 'Guide',
+    content: 'guide', desc: 'A complete guide to touch typing: which finger presses each key, the home row, posture, a practice plan and answers to common questions.' },
+  '/test': { title: 'Typing Speed Test: Check Your WPM and Accuracy | Hakladaivrit', priority: '0.9', crumb: 'Typing test', info: 'test',
+    desc: 'A free typing speed test by time, word count or quote. Get your words per minute, characters per minute, accuracy and the keys worth improving.' },
+  '/lessons': { title: 'Touch Typing Lessons: 24 Step-by-Step Lessons | Hakladaivrit', priority: '0.9', crumb: 'Lessons', info: 'lessons',
+    desc: 'Learn touch typing step by step: the home row, the top and bottom rows, capitals, punctuation and numbers, with virtual hands that show which finger to use.' },
+  '/practice': { title: 'Typing Practice That Targets Your Weak Keys | Hakladaivrit', priority: '0.8', crumb: 'Practice', info: 'practice',
+    desc: 'Smart typing practice: the site finds the keys and words you get wrong and builds exercises that strengthen exactly those.' },
+  '/game': { title: 'Typing Game for Kids: Pop the Balloons | Hakladaivrit', priority: '0.9', crumb: 'Balloon game', info: 'game',
+    desc: 'A free typing game for kids: pop balloons with letters and words and learn where every letter is on the keyboard, with hands that show which finger to use.' },
+  '/texts': { title: 'Typing Practice Texts: History, Science and Nature | Hakladaivrit', priority: '0.8', crumb: 'Texts', info: 'texts',
+    desc: 'Short, interesting texts for touch typing practice: history, science and space, animals and the English language. You can also practice on your own text.' },
+  '/leaderboard': { title: 'Leaderboard: The Fastest Typists | Hakladaivrit', priority: '0.6', crumb: 'Leaderboard', info: 'leaderboard',
+    desc: 'Who types the fastest? The weekly speed table, the all-time table, the balloon game and XP points.' },
+  '/texts/mine': { title: 'Type Your Own Text | Hakladaivrit', desc: HOME_DESC_EN, noindex: true },
+  '/privacy': { title: 'Privacy Policy | Hakladaivrit', priority: '0.3', crumb: 'Privacy policy',
+    desc: 'What information Hakladaivrit collects, how it is used and how you can delete it.' },
+  '/profile': { title: 'My Stats | Hakladaivrit', desc: HOME_DESC_EN, noindex: true },
+  '/admin': { title: 'Admin | Hakladaivrit', desc: HOME_DESC_EN, noindex: true },
+};
+const EN_PREFIX = /^\/en(?=\/|$)/;
+
+// Lesson titles and descriptions come from public/js/data.js (Hebrew course) and
+// public/js/data-en.js (English course, EN_LESSONS_EN for its English text), the files the site uses.
+const sourceCache = {};
+async function source(env, origin, file) {
+  if (!sourceCache[file]) sourceCache[file] = await (await env.ASSETS.fetch(new Request(origin + file))).text();
+  return sourceCache[file];
+}
+const unq = s => s.replace(/\\'/g, "'");
+const field = (s, name) => { const f = new RegExp(`${name}:\\s*'((?:[^'\\\\]|\\\\.)*)'`).exec(s); return f ? unq(f[1]) : null; };
+const strings = s => [...s.matchAll(/'((?:[^'\\]|\\.)*)'|"([^"]*)"/g)].map(x => (x[2] != null ? x[2] : unq(x[1])));
+const block = (src, name) => (new RegExp(`const ${name} = [\\[{]([\\s\\S]*?)\\n[\\]}];`).exec(src) || [, ''])[1];
+
+const lessonCache = {}, keyCache = {};
+async function lessons(env, origin, lang = 'he') {
+  if (lessonCache[lang]) return lessonCache[lang];
+  const he = await source(env, origin, '/js/data.js');
+  const en = lang === 'en' ? await source(env, origin, '/js/data-en.js') : '';
+  const own = lang === 'en' ? {} : null;
+  if (own) {
+    for (const m of `${block(en, 'EN_LESSONS_EN')}\n`.matchAll(/(\d+):\s*\{([\s\S]*?)\},?\n/g)) {
+      own[m[1]] = { group: field(m[2], 'group'), title: field(m[2], 'title'), desc: field(m[2], 'desc') };
+    }
+  }
   const list = [];
   const re = /\{\s*id:\s*(\d+),([\s\S]*?)desc:\s*'((?:[^'\\]|\\.)*)'\s*\}/g;
-  let m;
-  while ((m = re.exec(src))) {
+  for (const m of block(lang === 'en' ? en : he, lang === 'en' ? 'EN_LESSONS' : 'LESSONS').matchAll(re)) {
     const keys = /newKeys:\s*\[([^\]]*)\]/.exec(m[2]);
     const target = /target:\s*(\d+)/.exec(m[2]);
+    const tr = own ? own[m[1]] || {} : {};
     list.push({
-      id: Number(m[1]), title: field(m[2], 'title') || `שיעור ${m[1]}`, desc: unq(m[3]),
-      group: field(m[2], 'group') || (list.length ? list[list.length - 1].group : ''),
+      id: Number(m[1]), title: tr.title || field(m[2], 'title') || m[1], desc: tr.desc || unq(m[3]),
+      group: (own ? tr.group : field(m[2], 'group')) || (list.length ? list[list.length - 1].group : ''),
       type: field(m[2], 'type'), newKeys: keys ? strings(keys[1]) : [], target: target ? Number(target[1]) : 0,
     });
   }
-  lessonCache = list;
-  keyCache = keyboard(src, strings);
+  keyCache[lang] = keyboard(he, en, lang);
+  lessonCache[lang] = list;
   return list;
 }
 
-// Each key's finger, row and English label, from KEY_ROWS, SHIFT_CHARS and FINGER_NAMES in data.js.
-let keyCache = null;
-function keyboard(src, strings) {
-  const block = name => (new RegExp(`const ${name} = [\\[{]([\\s\\S]*?)\\n[\\]}];`).exec(src) || [, ''])[1];
-  const fingers = Object.fromEntries([...block('FINGER_NAMES').matchAll(/(\w+):\s*'([^']*)'/g)].map(x => [x[1], x[2]]));
-  const rows = ['שורת המספרים', 'השורה העליונה', 'שורת הבית', 'השורה התחתונה'];
+// Each key's finger, row and (on the Hebrew site) English label, from KEY_ROWS, SHIFT_CHARS
+// and FINGER_NAMES in data.js, and EN_KEYS and FINGER_NAMES_EN in data-en.js.
+function keyboard(he, en, lang) {
+  const names = src => Object.fromEntries([...src.matchAll(/(\w+):\s*'([^']*)'/g)].map(x => [x[1], x[2]]));
+  const fingers = names(block(lang === 'en' ? en : he, lang === 'en' ? 'FINGER_NAMES_EN' : 'FINGER_NAMES'));
+  const rows = lang === 'en' ? ['number row', 'top row', 'home row', 'bottom row'] : ['שורת המספרים', 'השורה העליונה', 'שורת הבית', 'השורה התחתונה'];
   const keys = {}, byCode = {};
-  block('KEY_ROWS').split(/\n\s*\],\s*\n\s*\[/).forEach((row, ri) => {
+  block(he, 'KEY_ROWS').split(/\n\s*\],\s*\n\s*\[/).forEach((row, ri) => {
     for (const k of row.matchAll(/\[\s*'(\w+)',\s*((?:'(?:[^'\\]|\\.)*'|"[^"]*"),\s*(?:'(?:[^'\\]|\\.)*'|"[^"]*")),\s*'(\w+)'/g)) {
-      const [he, en] = strings(k[2]);
-      byCode[k[1]] = { he, en: en || he, finger: fingers[k[3]], row: rows[ri] };
-      if (k[3] !== 'mod' && !keys[he]) keys[he] = { ...byCode[k[1]], label: (en || he).toUpperCase() };
+      const [heCh, enCh] = strings(k[2]);
+      byCode[k[1]] = { en: enCh || heCh, finger: fingers[k[3]], row: rows[ri] };
+      const ch = lang === 'en' ? (enCh || heCh).toLowerCase() : heCh;
+      if (k[3] !== 'mod' && !keys[ch]) keys[ch] = { ...byCode[k[1]], label: (enCh || heCh).toUpperCase() };
     }
   });
-  for (const x of block('SHIFT_CHARS').matchAll(/(\w+):\s*('(?:[^'\\]|\\.)*'|"[^"]*")/g)) {
+  const shifted = lang === 'en'
+    ? [...block(en, 'EN_KEYS').matchAll(/(\w+):\s*\[[^,\]]+,\s*('(?:[^'\\]|\\.)*'|"[^"]*")\]/g)]
+    : [...block(he, 'SHIFT_CHARS').matchAll(/(\w+):\s*('(?:[^'\\]|\\.)*'|"[^"]*")/g)];
+  for (const x of shifted) {
     const ch = strings(x[2])[0], k = byCode[x[1]];
     if (k && !keys[ch]) keys[ch] = { ...k, label: `Shift + ${k.en.toUpperCase()}` };
   }
   return keys;
 }
 
-let textsCache = null;
-async function textsData(env, origin) {
-  if (textsCache) return textsCache;
-  const r = await env.ASSETS.fetch(new Request(origin + '/data/texts.json'));
-  textsCache = r.ok ? await r.json() : { categories: {}, texts: [] };
-  return textsCache;
+const textsCache = {};
+async function textsData(env, origin, lang = 'he') {
+  if (textsCache[lang]) return textsCache[lang];
+  const r = await env.ASSETS.fetch(new Request(origin + (lang === 'en' ? '/data/texts-en.json' : '/data/texts.json')));
+  textsCache[lang] = r.ok ? await r.json() : { categories: {}, texts: [] };
+  return textsCache[lang];
 }
 
+// What to serve for an address: its language (/en is the English site), title, description and
+// what goes in the page. `path` is the full address, `local` the same page without /en.
 async function pageMeta(env, url) {
   const path = url.pathname.replace(/\/+$/, '') || '/';
-  if (PAGES[path]) return { path, ...PAGES[path] };
-  const lesson = /^\/lesson\/(\d+)$/.exec(path);
+  const lang = EN_PREFIX.test(path) ? 'en' : 'he';
+  const local = path.replace(EN_PREFIX, '') || '/';
+  const base = lang === 'en' ? '/en' : '';
+  const L = (heText, enText) => (lang === 'en' ? enText : heText);
+  const site = { path, local, lang, base, L };
+  const pages = lang === 'en' ? PAGES_EN : PAGES;
+  if (pages[local]) return { ...site, ...pages[local] };
+  const lesson = /^\/lesson\/(\d+)$/.exec(local);
   if (lesson) {
-    const all = await lessons(env, url.origin);
+    const all = await lessons(env, url.origin, lang);
     const l = all.find(x => x.id === Number(lesson[1]));
     if (!l) return null;
     return {
-      path, lesson: l, total: all.length, crumb: `שיעור ${l.id}`,
-      title: `שיעור ${l.id}: ${l.title} | הקלדה עיוורת`,
-      desc: `שיעור ${l.id} מתוך ${all.length} בקורס ההקלדה העיוורת בעברית. ${l.desc}`,
+      ...site, lesson: l, total: all.length, crumb: L(`שיעור ${l.id}`, `Lesson ${l.id}`),
+      title: L(`שיעור ${l.id}: ${l.title} | הקלדה עיוורת`, `Lesson ${l.id}: ${l.title} | Hakladaivrit`),
+      desc: L(`שיעור ${l.id} מתוך ${all.length} בקורס ההקלדה העיוורת בעברית. ${l.desc}`, `Lesson ${l.id} of ${all.length} in the free touch typing course. ${l.desc}`),
     };
   }
-  const text = /^\/texts\/([\w-]+)$/.exec(path);
+  const text = /^\/texts\/([\w-]+)$/.exec(local);
   if (text) {
-    const data = await textsData(env, url.origin);
+    const data = await textsData(env, url.origin, lang);
     const t = data.texts.find(x => x.slug === text[1]);
     if (!t) return null;
+    const cat = data.categories[t.category] || '';
     return {
-      path, text: t, category: data.categories[t.category] || '', crumb: t.title,
-      title: `${t.title}: טקסט להקלדה | הקלדה עיוורת`,
-      desc: `${t.intro} טקסט קצר על ${data.categories[t.category] || 'נושא מעניין'} לתרגול הקלדה עיוורת בעברית.`,
+      ...site, text: t, category: cat, crumb: t.title,
+      title: L(`${t.title}: טקסט להקלדה | הקלדה עיוורת`, `${t.title}: Typing Text | Hakladaivrit`),
+      desc: L(`${t.intro} טקסט קצר על ${cat || 'נושא מעניין'} לתרגול הקלדה עיוורת בעברית.`, `${t.intro} A short text about ${(cat || 'an interesting topic').toLowerCase()} for touch typing practice.`),
     };
   }
-  if (/^\/custom\/[\w-]+$/.test(path)) return { path, title: 'שיעור אישי | הקלדה עיוורת', desc: HOME_DESC, noindex: true };
+  if (/^\/custom\/[\w-]+$/.test(local)) return { ...site, title: L('שיעור אישי | הקלדה עיוורת', 'Personal Lesson | Hakladaivrit'), desc: L(HOME_DESC, HOME_DESC_EN), noindex: true };
   return null;
 }
 
@@ -575,65 +632,71 @@ const siteOrigin = url => (/^(localhost|127\.|\[::1\])/.test(url.hostname) ? url
 const attr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 function structuredData(meta, origin, body) {
-  const home = `${origin}/`;
-  const org = { '@type': 'Organization', '@id': `${home}#organization`, name: SITE, alternateName: SITE_ALT_NAMES, url: home, logo: `${origin}/icon-512.png` };
+  const { L, base, local } = meta;
+  const lang = meta.lang;
+  const home = `${origin}${base || ''}/`.replace(/\/en\/$/, '/en');
+  const name = L(SITE, SITE_EN);
+  const org = { '@type': 'Organization', '@id': `${origin}/#organization`, name: SITE, alternateName: SITE_ALT_NAMES, url: `${origin}/`, logo: `${origin}/icon-512.png` };
+  const page = `${origin}${meta.path}`;
   const faq = body.faq && body.faq.length ? {
-    '@type': 'FAQPage', '@id': `${origin}${meta.path === '/' ? '/' : meta.path}#faq`,
+    '@type': 'FAQPage', '@id': `${local === '/' ? home : page}#faq`,
     mainEntity: body.faq.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
   } : null;
-  const trail = [{ name: SITE, item: home }];
-  if (meta.lesson) trail.push({ name: 'שיעורים', item: `${origin}/lessons` });
-  if (meta.text) trail.push({ name: 'טקסטים', item: `${origin}/texts` });
-  if (meta.crumb) trail.push({ name: meta.crumb, item: `${origin}${meta.path}` });
+  const trail = [{ name, item: home }];
+  if (meta.lesson) trail.push({ name: L('שיעורים', 'Lessons'), item: `${origin}${base}/lessons` });
+  if (meta.text) trail.push({ name: L('טקסטים', 'Texts'), item: `${origin}${base}/texts` });
+  if (meta.crumb) trail.push({ name: meta.crumb, item: page });
   const crumbs = {
     '@type': 'BreadcrumbList',
     itemListElement: trail.map((t, i) => ({ '@type': 'ListItem', position: i + 1, name: t.name, item: t.item })),
   };
+  const price = { '@type': 'Offer', price: '0', priceCurrency: L('ILS', 'USD') };
   const graph = [];
-  if (meta.path === '/') {
+  if (local === '/') {
     graph.push(
-      { '@type': 'WebSite', '@id': `${home}#website`, url: home, name: SITE, alternateName: SITE_ALT_NAMES, inLanguage: 'he', publisher: { '@id': org['@id'] } },
+      { '@type': 'WebSite', '@id': `${home}#website`, url: home, name, alternateName: L(SITE_ALT_NAMES, ['Hakladaivrit touch typing', 'hakladaivrit.com']), inLanguage: lang, publisher: { '@id': org['@id'] } },
       org,
       {
-        '@type': 'WebApplication', name: 'הקלדה עיוורת בעברית', url: home, inLanguage: 'he',
-        applicationCategory: 'EducationalApplication', operatingSystem: 'Any', browserRequirements: 'דפדפן מודרני ומקלדת פיזית',
-        isAccessibleForFree: true, description: HOME_DESC, image: `${origin}/og-image.png`,
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'ILS' },
-        featureList: ['מבחן מהירות הקלדה בעברית', `${body.lessonCount} שיעורי הקלדה עיוורת מדורגים`, 'ידיים וירטואליות שמראות איזו אצבע ללחוץ', 'תרגול חכם של מקשים חלשים', 'ניתוח דיוק ומהירות לכל מקש ואצבע'],
+        '@type': 'WebApplication', name: L('הקלדה עיוורת בעברית', 'Hakladaivrit touch typing'), url: home, inLanguage: lang,
+        applicationCategory: 'EducationalApplication', operatingSystem: 'Any', browserRequirements: L('דפדפן מודרני ומקלדת פיזית', 'A modern browser and a physical keyboard'),
+        isAccessibleForFree: true, description: L(HOME_DESC, HOME_DESC_EN), image: `${origin}/og-image.png`, offers: price,
+        featureList: L(
+          ['מבחן מהירות הקלדה בעברית', `${body.lessonCount} שיעורי הקלדה עיוורת מדורגים`, 'ידיים וירטואליות שמראות איזו אצבע ללחוץ', 'תרגול חכם של מקשים חלשים', 'ניתוח דיוק ומהירות לכל מקש ואצבע'],
+          ['Typing speed test', `${body.lessonCount} step-by-step touch typing lessons`, 'Virtual hands that show which finger to use', 'Smart practice of weak keys', 'Speed and accuracy analysis for every key and finger']),
       },
     );
   } else {
     graph.push(crumbs);
   }
-  if (meta.path === '/guide') {
+  if (local === '/guide') {
     graph.push({
-      '@type': 'Article', headline: 'מדריך הקלדה עיוורת בעברית', description: meta.desc, inLanguage: 'he',
-      url: `${origin}/guide`, mainEntityOfPage: `${origin}/guide`, image: `${origin}/og-image.png`,
-      author: { '@id': org['@id'] }, publisher: org, datePublished: '2026-09-29', dateModified: '2026-09-29',
+      '@type': 'Article', headline: L('מדריך הקלדה עיוורת בעברית', 'Touch typing guide'), description: meta.desc, inLanguage: lang,
+      url: page, mainEntityOfPage: page, image: `${origin}/og-image.png`,
+      author: { '@id': org['@id'] }, publisher: org, datePublished: L('2026-09-29', '2026-10-03'), dateModified: L('2026-09-29', '2026-10-03'),
     });
   }
-  if (meta.path === '/lessons' && body.lessons) {
+  if (local === '/lessons' && body.lessons) {
     graph.push({
-      '@type': 'Course', name: 'קורס הקלדה עיוורת בעברית', description: meta.desc, url: `${origin}/lessons`, inLanguage: 'he',
-      isAccessibleForFree: true, provider: org, educationalLevel: 'מתחילים',
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'ILS', category: 'Free' },
+      '@type': 'Course', name: L('קורס הקלדה עיוורת בעברית', 'Touch typing course'), description: meta.desc, url: page, inLanguage: lang,
+      isAccessibleForFree: true, provider: org, educationalLevel: L('מתחילים', 'Beginner'),
+      offers: { ...price, category: 'Free' },
       hasCourseInstance: { '@type': 'CourseInstance', courseMode: 'online', courseWorkload: 'PT4H' },
-      syllabusSections: body.lessons.map(l => ({ '@type': 'Syllabus', name: `שיעור ${l.id}: ${l.title}`, description: l.desc, url: `${origin}/lesson/${l.id}` })),
+      syllabusSections: body.lessons.map(l => ({ '@type': 'Syllabus', name: `${L('שיעור', 'Lesson')} ${l.id}: ${l.title}`, description: l.desc, url: `${origin}${base}/lesson/${l.id}` })),
     });
   }
   if (meta.text) {
     graph.push({
-      '@type': 'Article', headline: meta.text.title, description: meta.text.intro, inLanguage: 'he',
-      articleSection: meta.category, url: `${origin}${meta.path}`, mainEntityOfPage: `${origin}${meta.path}`,
+      '@type': 'Article', headline: meta.text.title, description: meta.text.intro, inLanguage: lang,
+      articleSection: meta.category, url: page, mainEntityOfPage: page,
       image: `${origin}/og-image.png`, author: { '@id': org['@id'] }, publisher: org, isAccessibleForFree: true,
-      audience: { '@type': 'Audience', audienceType: meta.text.audience === 'kids' ? 'ילדים' : 'כל הגילים' },
+      audience: { '@type': 'Audience', audienceType: meta.text.audience === 'kids' ? L('ילדים', 'Children') : L('כל הגילים', 'All ages') },
     });
   }
-  if (meta.path === '/game') {
+  if (local === '/game') {
     graph.push({
-      '@type': 'VideoGame', name: 'משחק הבלונים', description: meta.desc, url: `${origin}/game`, inLanguage: 'he',
-      genre: 'משחק חינוכי', gamePlatform: 'דפדפן', applicationCategory: 'Game', isAccessibleForFree: true,
-      audience: { '@type': 'PeopleAudience', suggestedMinAge: 6 }, offers: { '@type': 'Offer', price: '0', priceCurrency: 'ILS' },
+      '@type': 'VideoGame', name: L('משחק הבלונים', 'Balloon typing game'), description: meta.desc, url: page, inLanguage: lang,
+      genre: L('משחק חינוכי', 'Educational game'), gamePlatform: L('דפדפן', 'Web browser'), applicationCategory: 'Game', isAccessibleForFree: true,
+      audience: { '@type': 'PeopleAudience', suggestedMinAge: 6 }, offers: price,
     });
   }
   if (faq) graph.push(faq);
@@ -644,8 +707,8 @@ function structuredData(meta, origin, body) {
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const stripTags = h => h.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
-async function fragment(env, url, name) {
-  const r = await env.ASSETS.fetch(new Request(`${url.origin}/content/${name}.html`));
+async function fragment(env, url, name, lang) {
+  const r = await env.ASSETS.fetch(new Request(`${url.origin}/content/${lang === 'en' ? 'en/' : ''}${name}.html`));
   return r.ok ? r.text() : '';
 }
 function faqFrom(html) {
@@ -655,87 +718,110 @@ function faqFrom(html) {
   while ((m = re.exec(html))) out.push({ q: stripTags(m[1]), a: stripTags(m[2]) });
   return out;
 }
+// Links in the English site's HTML point inside /en (the page's JS does the same in the browser).
+const localLinks = (html, base) => (!base ? html : html.replace(/href="\/([^"]*)"/g, (m, p) => (/^en($|[/?#])/.test(p) ? m : `href="${base}${p && !/^[?#]/.test(p) ? '/' : ''}${p}"`)));
 
 async function pageBody(env, url, meta) {
+  const body = await pageContent(env, url, meta);
+  body.html = localLinks(body.html, meta.base);
+  return body;
+}
+
+async function pageContent(env, url, meta) {
+  const { L, lang, local } = meta;
   if (meta.content) {
-    const html = await fragment(env, url, meta.content);
-    const lessonCount = meta.path === '/' ? (await lessons(env, url.origin)).length : 0;
+    const html = await fragment(env, url, meta.content, lang);
+    const lessonCount = local === '/' ? (await lessons(env, url.origin, lang)).length : 0;
     return { html, ssr: meta.content, faq: faqFrom(html), lessonCount };
   }
-  if (meta.path === '/lessons') {
-    const all = await lessons(env, url.origin);
-    const list = `<section class="page"><h1>שיעורי הקלדה עיוורת בעברית</h1>
-<p>${all.length} שיעורים מדורגים: מתחילים בשורת הבית, ומשם כל שיעור מוסיף שני מקשים חדשים, מהאותיות הנפוצות אל הנדירות.</p>
-<ol>${all.map(l => `<li><a href="/lesson/${l.id}">שיעור ${l.id}: ${esc(l.title)}</a>. ${esc(l.desc)}</li>`).join('')}</ol></section>`;
-    return { html: list + await fragment(env, url, 'lessons'), lessons: all };
+  if (local === '/lessons') {
+    const all = await lessons(env, url.origin, lang);
+    const list = `<section class="page"><h1>${L('שיעורי הקלדה עיוורת בעברית', 'Touch typing lessons')}</h1>
+<p>${L(`${all.length} שיעורים מדורגים: מתחילים בשורת הבית, ומשם כל שיעור מוסיף שני מקשים חדשים, מהאותיות הנפוצות אל הנדירות.`,
+    `${all.length} step-by-step lessons: start on the home row, then each lesson adds two new keys, from the most common letters to the rarest.`)}</p>
+<ol>${all.map(l => `<li><a href="/lesson/${l.id}">${L('שיעור', 'Lesson')} ${l.id}: ${esc(l.title)}</a>. ${esc(l.desc)}</li>`).join('')}</ol></section>`;
+    return { html: list + await fragment(env, url, 'lessons', lang), lessons: all };
   }
-  if (meta.path === '/texts') {
-    const data = await textsData(env, url.origin);
-    const list = `<section class="page"><h1>טקסטים להקלדה</h1>
-<p>מתרגלים הקלדה עיוורת ולומדים משהו חדש בדרך: היסטוריה, מדע, טבע והשפה העברית.</p>
+  if (local === '/texts') {
+    const data = await textsData(env, url.origin, lang);
+    const list = `<section class="page"><h1>${L('טקסטים להקלדה', 'Texts to type')}</h1>
+<p>${L('מתרגלים הקלדה עיוורת ולומדים משהו חדש בדרך: היסטוריה, מדע, טבע והשפה העברית.', 'Practice touch typing and learn something new on the way: history, science, nature and the English language.')}</p>
 ${Object.entries(data.categories).map(([k, name]) => `<h2>${esc(name)}</h2><ul>${data.texts.filter(t => t.category === k)
     .map(t => `<li><a href="/texts/${t.slug}">${esc(t.title)}</a>. ${esc(t.intro)}</li>`).join('')}</ul>`).join('\n')}
-<p><a href="/texts/mine">תרגול על טקסט משלכם</a></p></section>`;
-    return { html: list + await fragment(env, url, 'texts') };
+<p><a href="/texts/mine">${L('תרגול על טקסט משלכם', 'Practice on your own text')}</a></p></section>`;
+    return { html: list + await fragment(env, url, 'texts', lang) };
   }
   if (meta.info) {
-    const html = await fragment(env, url, meta.info);
+    const html = await fragment(env, url, meta.info, lang);
     return { html, ssr: meta.info };
   }
   if (meta.text) {
     // The same "about this text" box the page shows under the typing area (texts.js, viewText).
     const t = meta.text;
-    const data = await textsData(env, url.origin);
+    const data = await textsData(env, url.origin, lang);
     const related = data.texts.filter(x => x.category === t.category && x !== t);
     const words = t.text.split(' ').length;
     const mins = Math.max(1, Math.round(words / 30));
     return {
-      html: `<article class="page"><div class="lesson-head"><a class="back" href="/texts">כל הטקסטים</a>
+      html: `<article class="page"><div class="lesson-head"><a class="back" href="/texts">${L('כל הטקסטים', 'All texts')}</a>
 <div class="lesson-meta">${esc(meta.category)} · ${esc(t.level)}</div><h1>${esc(t.title)}</h1><p>${esc(t.intro)}</p></div>
 <p>${esc(t.text)}</p>
-<div class="page-info content"><h2>על הטקסט</h2>
-<p>${words} מילים ו־${t.text.length} תווים. בקצב של 30 מילים לדקה מקלידים אותו ${mins === 1 ? 'בדקה אחת בערך' : `בערך ב־${mins} דקות`}.</p>
-${related.length ? `<h3>עוד טקסטים: ${esc(meta.category)}</h3><ul>${related.map(x => `<li><a href="/texts/${x.slug}">${esc(x.title)}</a> – ${esc(x.intro)}</li>`).join('')}</ul>` : ''}
-<p><a href="/texts">כל הטקסטים</a> · <a href="/texts/mine">תרגול על טקסט משלכם</a> · <a href="/test">מבחן הקלדה</a></p></div></article>`,
+<div class="page-info content"><h2>${L('על הטקסט', 'About this text')}</h2>
+<p>${L(`${words} מילים ו־${t.text.length} תווים. בקצב של 30 מילים לדקה מקלידים אותו ${mins === 1 ? 'בדקה אחת בערך' : `בערך ב־${mins} דקות`}.`,
+    `${words} words and ${t.text.length} characters. At 30 words per minute it takes about ${mins === 1 ? 'one minute' : `${mins} minutes`} to type.`)}</p>
+${related.length ? `<h3>${L('עוד טקסטים', 'More texts')}: ${esc(meta.category)}</h3><ul>${related.map(x => `<li><a href="/texts/${x.slug}">${esc(x.title)}</a> – ${esc(x.intro)}</li>`).join('')}</ul>` : ''}
+<p><a href="/texts">${L('כל הטקסטים', 'All texts')}</a> · <a href="/texts/mine">${L('תרגול על טקסט משלכם', 'Practice on your own text')}</a> · <a href="/test">${L('מבחן הקלדה', 'Typing test')}</a></p></div></article>`,
     };
   }
   if (meta.lesson) {
     // The same "what this lesson teaches" box the page shows under the exercise (app.js, lessonAbout).
     const l = meta.lesson;
-    const all = await lessons(env, url.origin);
+    const all = await lessons(env, url.origin, lang);
+    const keyInfo = keyCache[lang];
     const idx = all.indexOf(l);
-    const keys = l.newKeys.filter(k => keyCache[k]).map(k => {
-      const info = keyCache[k];
-      return `<tr><td>${esc(k)}</td><td>${esc(info.finger)}</td><td>${esc(info.row)}</td><td dir="ltr">${esc(info.label)}</td></tr>`;
+    const keys = l.newKeys.filter(k => keyInfo[k]).map(k => {
+      const info = keyInfo[k];
+      return `<tr><td>${esc(k)}</td><td>${esc(info.finger)}</td><td>${esc(info.row)}</td>${L(`<td dir="ltr">${esc(info.label)}</td>`, '')}</tr>`;
     }).join('');
-    const letters = l.type ? [] : [...new Set(all.slice(0, idx + 1).filter(x => !x.type).flatMap(x => x.newKeys).filter(k => /^[א-ת]$/.test(k)))];
-    const link = x => `<a href="/lesson/${x.id}">שיעור ${x.id}: ${esc(x.title)}</a>`;
+    const letter = L(/^[א-ת]$/, /^[a-z]$/);
+    const letters = l.type ? [] : [...new Set(all.slice(0, idx + 1).filter(x => !x.type).flatMap(x => x.newKeys).filter(k => letter.test(k)))];
+    const link = x => `<a href="/lesson/${x.id}">${L('שיעור', 'Lesson')} ${x.id}: ${esc(x.title)}</a>`;
     const prev = all[idx - 1], next = all[idx + 1];
     return {
-      html: `<section class="page"><div class="lesson-head"><a class="back" href="/lessons">כל השיעורים</a>
-<div class="lesson-meta">שיעור ${l.id} מתוך ${meta.total} · ${esc(l.group)}</div><h1>${esc(l.title)}</h1><p>${esc(l.desc)}</p></div>
-<div class="page-info content"><h2>מה לומדים בשיעור ${l.id}</h2>
-<p>השיעור שייך לפרק "${esc(l.group)}" בקורס של ${meta.total} שיעורים. לשלושה כוכבים צריך דיוק של 97% ומעלה ולפחות ${l.target} מילים לדקה.</p>
-${keys ? `<h3>המקשים החדשים</h3><div class="table-wrap"><table><thead><tr><th>מקש</th><th>אצבע</th><th>שורה</th><th>המקש באנגלית</th></tr></thead><tbody>${keys}</tbody></table></div>` : ''}
-${letters.length ? `<p>האותיות שלמדתם עד עכשיו (${letters.length}): ${letters.map(esc).join(' ')}</p>` : ''}
-<h3>השיעורים הסמוכים</h3><ul>${prev ? `<li>השיעור הקודם: ${link(prev)}</li>` : ''}${next ? `<li>השיעור הבא: ${link(next)}</li>` : ''}
-<li><a href="/lessons">כל השיעורים</a> · <a href="/guide">מדריך הקלדה עיוורת</a> · <a href="/test">מבחן הקלדה</a></li></ul></div></section>`,
+      html: `<section class="page"><div class="lesson-head"><a class="back" href="/lessons">${L('כל השיעורים', 'All lessons')}</a>
+<div class="lesson-meta">${L(`שיעור ${l.id} מתוך ${meta.total}`, `Lesson ${l.id} of ${meta.total}`)} · ${esc(l.group)}</div><h1>${esc(l.title)}</h1><p>${esc(l.desc)}</p></div>
+<div class="page-info content"><h2>${L(`מה לומדים בשיעור ${l.id}`, `What you learn in lesson ${l.id}`)}</h2>
+<p>${L(`השיעור שייך לפרק "${esc(l.group)}" בקורס של ${meta.total} שיעורים. לשלושה כוכבים צריך דיוק של 97% ומעלה ולפחות ${l.target} מילים לדקה.`,
+    `This lesson is part of "${esc(l.group)}" in a course of ${meta.total} lessons. For three stars you need at least 97% accuracy and ${l.target} words per minute.`)}</p>
+${keys ? `<h3>${L('המקשים החדשים', 'New keys')}</h3><div class="table-wrap"><table><thead><tr><th>${L('מקש', 'Key')}</th><th>${L('אצבע', 'Finger')}</th><th>${L('שורה', 'Row')}</th>${L('<th>המקש באנגלית</th>', '')}</tr></thead><tbody>${keys}</tbody></table></div>` : ''}
+${letters.length ? `<p>${L('האותיות שלמדתם עד עכשיו', 'Letters you know so far')} (${letters.length}): ${letters.map(esc).join(' ')}</p>` : ''}
+<h3>${L('השיעורים הסמוכים', 'Nearby lessons')}</h3><ul>${prev ? `<li>${L('השיעור הקודם', 'Previous lesson')}: ${link(prev)}</li>` : ''}${next ? `<li>${L('השיעור הבא', 'Next lesson')}: ${link(next)}</li>` : ''}
+<li><a href="/lessons">${L('כל השיעורים', 'All lessons')}</a> · <a href="/guide">${L('מדריך הקלדה עיוורת', 'Touch typing guide')}</a> · <a href="/test">${L('מבחן הקלדה', 'Typing test')}</a></li></ul></div></section>`,
     };
   }
   return { html: '' };
 }
 
+// The same page on the other site, for pages that exist on both (hreflang).
+function alternates(meta, origin) {
+  if (meta.noindex || !PAGES[meta.local] || !PAGES_EN[meta.local]) return '';
+  const he = `${origin}${meta.local}`;
+  const en = `${origin}/en${meta.local === '/' ? '' : meta.local}`;
+  return `  <link rel="alternate" hreflang="he" href="${attr(he)}">\n  <link rel="alternate" hreflang="en" href="${attr(en)}">\n` +
+    `  <link rel="alternate" hreflang="x-default" href="${attr(en)}">\n`;
+}
+
 function withMeta(html, meta, origin, body) {
-  const url = `${origin}${meta.path === '/' ? '/' : meta.path}`;
+  const url = `${origin}${meta.path}`;
   html = html
     .replace(/<title>[^<]*<\/title>/, `<title>${attr(meta.title)}</title>`)
     .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${attr(meta.desc)}">`)
     .replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${attr(meta.title)}">`)
     .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${attr(meta.desc)}">`)
     .replace(/<meta property="og:url" content="[^"]*">/, `<meta property="og:url" content="${attr(url)}">`);
-  let head = `  <link rel="canonical" href="${attr(url)}">\n`;
+  let head = `  <link rel="canonical" href="${attr(url)}">\n${alternates(meta, origin)}`;
   if (meta.noindex) head += '  <meta name="robots" content="noindex">\n';
-  else if (meta.crumb || meta.path === '/') {
+  else if (meta.crumb || meta.local === '/') {
     head += `  <script type="application/ld+json">${JSON.stringify(structuredData(meta, origin, body)).replace(/</g, '\\u003c')}</script>\n`;
   }
   html = html.replace('</head>', `${head}</head>`);
@@ -746,9 +832,12 @@ function withMeta(html, meta, origin, body) {
 }
 
 async function sitemap(env, origin) {
-  const paths = Object.entries(PAGES).filter(([, p]) => !p.noindex).map(([path, p]) => [path, p.priority]);
-  (await lessons(env, origin)).forEach(l => paths.push([`/lesson/${l.id}`, '0.7']));
-  (await textsData(env, origin)).texts.forEach(t => paths.push([`/texts/${t.slug}`, '0.6']));
+  const paths = [];
+  for (const [lang, pages, base] of [['he', PAGES, ''], ['en', PAGES_EN, '/en']]) {
+    Object.entries(pages).filter(([, p]) => !p.noindex).forEach(([path, p]) => paths.push([path === '/' ? base || '/' : base + path, p.priority]));
+    (await lessons(env, origin, lang)).forEach(l => paths.push([`${base}/lesson/${l.id}`, '0.7']));
+    (await textsData(env, origin, lang)).texts.forEach(t => paths.push([`${base}/texts/${t.slug}`, '0.6']));
+  }
   const urls = paths.map(([p, pr]) => `  <url><loc>${origin}${p}</loc><priority>${pr}</priority></url>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
@@ -756,7 +845,7 @@ async function sitemap(env, origin) {
 // Search engines and AI assistants (ChatGPT, Gemini, Claude, Perplexity, Copilot…) are all welcome.
 const CRAWLERS = ['Googlebot', 'Google-Extended', 'Bingbot', 'OAI-SearchBot', 'ChatGPT-User', 'GPTBot', 'ClaudeBot', 'Claude-SearchBot',
   'Claude-User', 'PerplexityBot', 'Perplexity-User', 'Applebot', 'Applebot-Extended', 'DuckDuckBot', 'CCBot'];
-const RULES = 'Allow: /\nDisallow: /api/\nDisallow: /profile\nDisallow: /admin\nDisallow: /custom/\n';
+const RULES = 'Allow: /\nDisallow: /api/\nDisallow: /profile\nDisallow: /admin\nDisallow: /custom/\nDisallow: /en/profile\nDisallow: /en/admin\nDisallow: /en/custom/\n';
 const robots = origin => `${CRAWLERS.map(c => `User-agent: ${c}`).join('\n')}\n${RULES}\nUser-agent: *\n${RULES}\nSitemap: ${origin}/sitemap.xml\n`;
 
 // A plain-language summary for AI assistants (https://llmstxt.org).
@@ -787,6 +876,11 @@ ${all.map(l => `- [שיעור ${l.id}: ${l.title}](${origin}/lesson/${l.id}): ${
 
 ## טקסטים
 ${(await textsData(env, url.origin)).texts.map(t => `- [${t.title}](${origin}/texts/${t.slug}): ${t.intro}`).join('\n')}
+
+## English site (${origin}/en)
+> The same site in English, teaching English touch typing on the US QWERTY layout: a typing speed test, ${(await lessons(env, url.origin, 'en')).length} step-by-step lessons, smart practice of weak keys, a typing game for kids and texts to type. Free, no sign-up needed.
+
+${Object.entries(PAGES_EN).filter(([, p]) => !p.noindex).map(([p, m]) => `- [${m.title.replace(/ \| Hakladaivrit$/, '')}](${origin}/en${p === '/' ? '' : p}): ${m.desc}`).join('\n')}
 `;
 }
 
@@ -813,9 +907,37 @@ const SECURITY_HEADERS = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
 };
 
+// ---------- Which site a visitor sees ----------
+// Visitors outside Israel who open a Hebrew page go to the same page on the English site, unless
+// they chose Hebrew (the "site" cookie, set by the language link in the footer) or their browser
+// asks for Hebrew. Search engines and link previews are never redirected, so they keep seeing
+// both sites, and hreflang tells them the pages are translations of each other.
+const CRAWLER_UA = /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|whatsapp|telegram|discord|lighthouse|pagespeed|inspectiontool|headless/i;
+const cookie = (request, name) => (new RegExp(`(?:^|;\\s*)${name}=([^;]*)`).exec(request.headers.get('Cookie') || '') || [])[1];
+const redirect = (location, headers = {}) => new Response(null, { status: 302, headers: { Location: location, 'Cache-Control': 'no-store', ...headers } });
+
+function englishFor(meta) {
+  if (PAGES_EN[meta.local]) return meta.local === '/' ? '/en' : `/en${meta.local}`;
+  if (meta.lesson) return '/en/lessons';
+  if (meta.text) return '/en/texts';
+  return '/en';
+}
+
+function siteRedirect(request, url, meta) {
+  if (meta.lang !== 'he' || request.method !== 'GET') return null;
+  const chosen = cookie(request, 'site');
+  const ua = request.headers.get('User-Agent') || '';
+  if (chosen === 'he' || !ua || CRAWLER_UA.test(ua)) return null;
+  if (chosen !== 'en') {
+    const country = request.cf && request.cf.country;
+    if (!country || country === 'IL' || /^(he|iw)\b/i.test(request.headers.get('Accept-Language') || '')) return null;
+  }
+  return redirect(englishFor(meta) + url.search);
+}
+
 async function servePage(request, env, cfg, meta) {
   const url = new URL(request.url);
-  const asset = await env.ASSETS.fetch(new Request(url.origin + '/', { headers: request.headers }));
+  const asset = await env.ASSETS.fetch(new Request(url.origin + (meta.lang === 'en' ? '/en/' : '/'), { headers: request.headers }));
   if (!asset.ok) return asset;
   let html = withMeta(await asset.text(), meta, siteOrigin(url), await pageBody(env, url, meta));
   let nonce = null;
@@ -863,8 +985,18 @@ export default {
         url.pathname = url.pathname.replace(/\/+$/, '');
         return Response.redirect(url.toString(), 301);
       }
+      // The language links in the footer (?site=he / ?site=en) remember the visitor's choice.
+      const choice = url.searchParams.get('site');
+      if (choice === 'he' || choice === 'en') {
+        url.searchParams.delete('site');
+        return redirect(url.pathname + url.search, {
+          'Set-Cookie': `site=${choice}; Path=/; Max-Age=31536000; SameSite=Lax${url.protocol === 'https:' ? '; Secure' : ''}`,
+        });
+      }
+      // The Hebrew page about learning English typing has no English twin.
+      if (url.pathname === '/en/english') return Response.redirect(`${url.origin}/en`, 301);
       const meta = await pageMeta(env, url);
-      if (meta) return await servePage(request, env, cfg, meta);
+      if (meta) return siteRedirect(request, url, meta) || await servePage(request, env, cfg, meta);
       return env.ASSETS.fetch(request); // unknown pages get public/404.html with status 404
     } catch (e) {
       if (!e.status) console.error(e);

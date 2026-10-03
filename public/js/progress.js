@@ -5,13 +5,13 @@
 // days, and a weekly table with the same numbers (the chart's readable twin).
 
 const PROGRESS_METRICS = {
-  speed: { name: 'מהירות', sub: 'מילים לדקה · ממוצע יומי במבחני ההקלדה' },
-  acc: { name: 'דיוק', sub: 'אחוז הקשות נכונות · ממוצע יומי בכל האימונים' },
-  time: { name: 'זמן הקלדה', sub: 'דקות הקלדה בכל יום' },
+  speed: { name: tr('מהירות', 'Speed'), sub: tr('מילים לדקה · ממוצע יומי במבחני ההקלדה', 'words per minute · daily average on typing tests') },
+  acc: { name: tr('דיוק', 'Accuracy'), sub: tr('אחוז הקשות נכונות · ממוצע יומי בכל האימונים', 'percent correct keystrokes · daily average on all training') },
+  time: { name: tr('זמן הקלדה', 'Typing time'), sub: tr('דקות הקלדה בכל יום', 'minutes of typing each day') },
 };
-const PROGRESS_RANGES = { 30: '30 יום', 90: '90 יום', all: 'הכל' };
-const WEEKDAYS = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
-const MONTHS = ['ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳'];
+const PROGRESS_RANGES = { 30: tr('30 יום', '30 days'), 90: tr('90 יום', '90 days'), all: tr('הכל', 'All time') };
+const WEEKDAYS = [tr('א׳', 'Sun'), tr('ב׳', 'Mon'), tr('ג׳', 'Tue'), tr('ד׳', 'Wed'), tr('ה׳', 'Thu'), tr('ו׳', 'Fri'), tr('ש׳', 'Sat')];
+const MONTHS = [tr('ינו׳', 'Jan'), tr('פבר׳', 'Feb'), tr('מרץ', 'Mar'), tr('אפר׳', 'Apr'), tr('מאי', 'May'), tr('יוני', 'Jun'), tr('יולי', 'Jul'), tr('אוג׳', 'Aug'), tr('ספט׳', 'Sep'), tr('אוק׳', 'Oct'), tr('נוב׳', 'Nov'), tr('דצמ׳', 'Dec')];
 
 // The language a result was typed in. English tests and lessons are marked by their mode;
 // practice and texts can be either, so they count for both.
@@ -68,7 +68,7 @@ function fmtValue(metric, v) {
   if (metric === 'time') return v < 1 ? '<1' : String(Math.round(v));
   return String(Math.round(v));
 }
-const unitOf = metric => (metric === 'speed' ? 'מילים לדקה' : metric === 'acc' ? 'דיוק' : 'דקות');
+const unitOf = metric => (metric === 'speed' ? tr('מילים לדקה', 'words per minute') : metric === 'acc' ? tr('דיוק', 'accuracy') : tr('דקות', 'minutes'));
 
 // "Then vs now" for the range: the first and last few points, or totals for typing time.
 function progressSummary(metric, pts, byWeek) {
@@ -76,20 +76,20 @@ function progressSummary(metric, pts, byWeek) {
   if (metric === 'time') {
     const total = pts.reduce((s, p) => s + p.value, 0);
     const days = pts.length;
-    return fig('סך הכל', fmtTime(total * 60), 'זמן הקלדה בטווח') +
-      fig(byWeek ? 'שבועות' : 'ימים', days, byWeek ? 'שבועות שבהם התאמנתם' : 'ימים שבהם התאמנתם') +
-      fig('ממוצע', fmtValue('time', days ? total / days : 0), byWeek ? 'דקות בשבוע תרגול' : 'דקות ביום תרגול');
+    return fig(tr('סך הכל', 'Total'), fmtTime(total * 60), tr('זמן הקלדה בטווח', 'typing time in this range')) +
+      fig(byWeek ? tr('שבועות', 'weeks') : tr('ימים', 'days'), days, byWeek ? tr('שבועות שבהם התאמנתם', 'weeks you practiced') : tr('ימים שבהם התאמנתם', 'days you practiced')) +
+      fig(tr('ממוצע', 'Average'), fmtValue('time', days ? total / days : 0), byWeek ? tr('דקות בשבוע תרגול', 'minutes per week practiced') : tr('דקות ביום תרגול', 'minutes per day practiced'));
   }
   if (pts.length < 2) return '';
   const k = Math.min(3, Math.floor(pts.length / 2));
   const avg = arr => arr.reduce((s, p) => s + p.value, 0) / arr.length;
   const first = avg(pts.slice(0, k)), last = avg(pts.slice(-k));
   const diff = Math.round(last - first);
-  const unit = metric === 'acc' ? ' נק׳ אחוז' : ' מילים לדקה';
-  const change = diff === 0 ? 'ללא שינוי' : `${diff > 0 ? '▲' : '▼'} ${Math.abs(diff)}`;
-  return fig('בהתחלה', fmtValue(metric, first), k > 1 ? `ממוצע ${k} הימים הראשונים` : shortDate(pts[0].day)) +
-    fig('עכשיו', fmtValue(metric, last), k > 1 ? `ממוצע ${k} הימים האחרונים` : shortDate(pts[pts.length - 1].day)) +
-    fig('שינוי', change, diff === 0 ? '&nbsp;' : unit.trim(), diff > 0 ? 'up' : diff < 0 ? 'down' : '');
+  const unit = metric === 'acc' ? tr(' נק׳ אחוז', ' percentage points') : tr(' מילים לדקה', ' words per minute');
+  const change = diff === 0 ? tr('ללא שינוי', 'no change') : `${diff > 0 ? '▲' : '▼'} ${Math.abs(diff)}`;
+  return fig(tr('בהתחלה', 'Start'), fmtValue(metric, first), k > 1 ? `${tr('ממוצע', 'average')} ${k} ${tr('הימים הראשונים', 'first days')}` : shortDate(pts[0].day)) +
+    fig(tr('עכשיו', 'Now'), fmtValue(metric, last), k > 1 ? `${tr('ממוצע', 'average')} ${k} ${tr('הימים האחרונים', 'last days')}` : shortDate(pts[pts.length - 1].day)) +
+    fig(tr('שינוי', 'Change'), change, diff === 0 ? '&nbsp;' : unit.trim(), diff > 0 ? 'up' : diff < 0 ? 'down' : '');
 }
 
 // Line (speed, accuracy) or bars (typing time) on a time axis from `start` to today.
@@ -100,13 +100,13 @@ function progressChart(el, pts, { metric, start, end, byWeek }) {
   const bars = metric === 'time';
   if (pts.length < (bars ? 1 : 2)) {
     el.removeAttribute('aria-label');
-    el.innerHTML = `<p class="muted pg-empty" dir="rtl">${metric === 'speed'
-      ? 'צריך לפחות שני ימים עם מבחן הקלדה בטווח הזה כדי לראות מגמה.'
-      : 'אין מספיק נתונים בטווח הזה. המשיכו להתאמן והגרף יתמלא.'}</p>`;
+    el.innerHTML = `<p class="muted pg-empty" dir="${tr('rtl', 'ltr')}">${metric === 'speed'
+      ? tr('צריך לפחות שני ימים עם מבחן הקלדה בטווח הזה כדי לראות מגמה.', 'Need at least two days with a typing test in this range to see a trend.')
+      : tr('אין מספיק נתונים בטווח הזה. המשיכו להתאמן והגרף יתמלא.', 'Not enough data in this range. Keep practicing and the graph will fill up.')}</p>`;
     return;
   }
   const last = pts[pts.length - 1];
-  el.setAttribute('aria-label', `${PROGRESS_METRICS[metric].name}: ${pts.length} ${byWeek ? 'שבועות' : 'ימים'}, אחרון ${fmtValue(metric, last.value)} ${unitOf(metric)}`);
+  el.setAttribute('aria-label', `${PROGRESS_METRICS[metric].name}: ${pts.length} ${byWeek ? tr('שבועות', 'weeks') : tr('ימים', 'days')}, ${tr('אחרון', 'last')} ${fmtValue(metric, last.value)} ${unitOf(metric)}`);
   let active = null;
 
   function draw() {
@@ -180,9 +180,9 @@ function progressChart(el, pts, { metric, start, end, byWeek }) {
       cross.setAttribute('x1', px); cross.setAttribute('x2', px); cross.setAttribute('visibility', 'visible');
       if (!bars) { hover.setAttribute('cx', px); hover.setAttribute('cy', y(p.value)); hover.setAttribute('visibility', 'visible'); }
       tip.hidden = false;
-      $('strong', tip).textContent = `${fmtValue(metric, p.value)} ${metric === 'acc' ? 'דיוק' : unitOf(metric)}`;
-      const when = byWeek ? `השבוע של ${shortDate(p.day)}` : `יום ${weekday(p.day)} ${shortDate(p.day)}`;
-      const count = metric === 'speed' ? `${p.tests} ${p.tests === 1 ? 'מבחן' : 'מבחנים'}${p.tests > 1 ? ` · שיא ${Math.round(p.best)}` : ''}` : `${p.n} ${p.n === 1 ? 'אימון' : 'אימונים'}`;
+      $('strong', tip).textContent = `${fmtValue(metric, p.value)} ${metric === 'acc' ? tr('דיוק', 'accuracy') : unitOf(metric)}`;
+      const when = byWeek ? `${tr('השבוע של', 'Week of')} ${shortDate(p.day)}` : `${tr('יום', 'Day')} ${weekday(p.day)} ${shortDate(p.day)}`;
+      const count = metric === 'speed' ? `${p.tests} ${p.tests === 1 ? tr('מבחן', 'test') : tr('מבחנים', 'tests')}${p.tests > 1 ? ` · ${tr('שיא', 'best')} ${Math.round(p.best)}` : ''}` : `${p.n} ${p.n === 1 ? tr('אימון', 'training') : tr('אימונים', 'trainings')}`;
       $('span', tip).textContent = `${when} · ${count}`;
       const tx = Math.min(Math.max(px - tip.offsetWidth / 2, 0), W - tip.offsetWidth);
       tip.style.left = tx + 'px';
@@ -208,9 +208,9 @@ function progressChart(el, pts, { metric, start, end, byWeek }) {
 // The same numbers, week by week (newest first).
 function weeklyTable(d) {
   const weeks = bucketHistory(d, weekStart, () => true).reverse().slice(0, 12);
-  if (!weeks.length) return '<p class="muted">עדיין אין נתונים.</p>';
+  if (!weeks.length) return `<p class="muted">${tr('עדיין אין נתונים.', 'No data yet.')}</p>`;
   return `<table class="table">
-    <thead><tr><th>שבוע</th><th>אימונים</th><th>מהירות במבחנים</th><th>דיוק</th><th>זמן הקלדה</th></tr></thead>
+    <thead><tr><th>${tr('שבוע', 'Week')}</th><th>${tr('אימונים', 'Trainings')}</th><th>${tr('מהירות במבחנים', 'Speed on tests')}</th><th>${tr('דיוק', 'Accuracy')}</th><th>${tr('זמן הקלדה', 'Typing time')}</th></tr></thead>
     <tbody>${weeks.map(w => `<tr>
       <td class="num">${shortDate(w.day)}</td>
       <td class="num">${w.n}</td>
@@ -221,7 +221,7 @@ function weeklyTable(d) {
 }
 
 // A calendar of practice days, coloured by the XP earned that day (the daily goal is 100).
-const CAL_LEVELS = [[0, 'לא התאמנתם'], [1, 'עד 29 XP'], [30, '30 עד 99 XP'], [100, 'יעד יומי: 100 XP ומעלה'], [200, '200 XP ומעלה']];
+const CAL_LEVELS = [[0, tr('לא התאמנתם', 'No practice')], [1, tr('עד 29 XP', 'Up to 29 XP')], [30, tr('30 עד 99 XP', '30 to 99 XP')], [100, tr('יעד יומי: 100 XP ומעלה', 'Daily goal: 100 XP or more')], [200, tr('200 XP ומעלה', '200 XP or more')]];
 const calLevel = xp => (xp >= 200 ? 4 : xp >= 100 ? 3 : xp >= 30 ? 2 : xp > 0 ? 1 : 0);
 
 function practiceCalendar(el, sumEl, d) {
@@ -252,7 +252,7 @@ function practiceCalendar(el, sumEl, d) {
     }
     const labels = [1, 3, 5].map(r => `<text class="c-tick" x="${left - 6}" y="${topPad + r * stepPx + 10}" text-anchor="end">${WEEKDAYS[r]}</text>`).join('');
     const W = left + weeks * stepPx, H = topPad + 7 * stepPx;
-    el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${active} ימי תרגול ב־${weeks} השבועות האחרונים">${months}${labels}${cells}</svg>
+    el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${active} ${tr('ימי תרגול ב־', 'practice days in the last ')}${weeks} ${tr('השבועות האחרונים', 'weeks')}">${months}${labels}${cells}</svg>
       <div class="c-tip" hidden><strong></strong><span></span></div>`;
     const svg = $('svg', el), tip = $('.c-tip', el);
     svg.addEventListener('pointermove', e => {
@@ -261,15 +261,15 @@ function practiceCalendar(el, sumEl, d) {
       const c = grid.find(x => x.w === w && x.r === r);
       if (!c) { tip.hidden = true; return; }
       tip.hidden = false;
-      $('strong', tip).textContent = c.xp ? `${c.xp} XP` : 'לא התאמנתם';
-      $('span', tip).textContent = `יום ${weekday(c.day)} ${shortDate(c.day)}${c.n ? ` · ${c.n} ${c.n === 1 ? 'אימון' : 'אימונים'}` : ''}`;
+      $('strong', tip).textContent = c.xp ? `${c.xp} XP` : tr('לא התאמנתם', 'No practice');
+      $('span', tip).textContent = `${tr('יום', 'Day')} ${weekday(c.day)} ${shortDate(c.day)}${c.n ? ` · ${c.n} ${c.n === 1 ? tr('אימון', 'training') : tr('אימונים', 'trainings')}` : ''}`;
       const cx = left + c.w * stepPx + cell / 2;
       tip.style.left = Math.min(Math.max(cx - tip.offsetWidth / 2, 0), W - tip.offsetWidth) + 'px';
       tip.style.top = Math.max(0, topPad + c.r * stepPx - tip.offsetHeight - 6) + 'px';
     });
     svg.addEventListener('pointerleave', () => { tip.hidden = true; });
     const best = Math.max(g.bestStreak || 0, Gamify.streak(g));
-    sumEl.innerHTML = `<b class="num">${active}</b> ימי תרגול ב־${weeks} השבועות האחרונים · הרצף הארוך ביותר: <b class="num">${best}</b> ${best === 1 ? 'יום' : 'ימים'}`;
+    sumEl.innerHTML = `<b class="num">${active}</b> ${tr('ימי תרגול ב־', 'practice days in the last ')}${weeks} ${tr('השבועות האחרונים', 'weeks')} · ${tr('הרצף הארוך ביותר:', 'Longest streak:')} <b class="num">${best}</b> ${best === 1 ? tr('יום', 'day') : tr('ימים', 'days')}`;
   }
   draw();
   onResizeWhile(el, draw);
@@ -280,7 +280,7 @@ function progressSection() {
   const b = (group, key, label) => `<button class="cfg-btn" data-${group}="${key}">${label}</button>`;
   return `
     <div class="pg-top">
-      <h2 class="section-title">ההתקדמות שלי לאורך זמן</h2>
+      <h2 class="section-title">${tr('ההתקדמות שלי לאורך זמן', 'My progress over time')}</h2>
       <div class="config pg-filters">
         <div class="cfg-group">${Object.entries(PROGRESS_METRICS).map(([k, v]) => b('metric', k, v.name)).join('')}</div>
         <div class="cfg-sep"></div>
@@ -291,15 +291,15 @@ function progressSection() {
       <p class="panel-sub" id="pg-sub"></p>
       <div class="pg-summary" id="pg-summary"></div>
       <div class="chart" id="pg-chart"></div>
-      <details class="pg-table"><summary>הנתונים לפי שבוע</summary><div id="pg-weeks"></div></details>
+      <details class="pg-table"><summary>${tr('הנתונים לפי שבוע', 'Data by week')}</summary><div id="pg-weeks"></div></details>
     </div>
     <div class="panel">
-      <h2>ימי תרגול</h2>
-      <p class="panel-sub">כל ריבוע הוא יום. ככה נראית התמדה.</p>
+      <h2>${tr('ימי תרגול', 'Practice days')}</h2>
+      <p class="panel-sub">${tr('כל ריבוע הוא יום. ככה נראית התמדה.', 'Each square is a day. This is what consistency looks like.')}</p>
       <div class="calendar" id="pg-cal"></div>
       <div class="cal-foot">
         <span id="pg-cal-sum"></span>
-        <span class="cal-legend" aria-hidden="true">פחות ${CAL_LEVELS.map((l, i) => `<i class="lv${i}" title="${l[1]}"></i>`).join('')} יותר</span>
+        <span class="cal-legend" aria-hidden="true">${tr('פחות', 'Less')} ${CAL_LEVELS.map((l, i) => `<i class="lv${i}" title="${l[1]}"></i>`).join('')} ${tr('יותר', 'More')}</span>
       </div>
     </div>`;
 }
@@ -315,7 +315,7 @@ function mountProgress(d) {
     const byWeek = st.metric === 'time' && (dayTime(end) - dayTime(start)) / 86400000 > 120;
     const from = byWeek ? weekStart(start) : start;
     const pts = progressPoints(d, st.metric, from, byWeek);
-    $('#pg-sub').textContent = PROGRESS_METRICS[st.metric].sub.replace('בכל יום', byWeek ? 'בכל שבוע' : 'בכל יום') + (st.metric === 'speed' && LANG === 'en' ? ' באנגלית' : '');
+    $('#pg-sub').textContent = PROGRESS_METRICS[st.metric].sub.replace(tr('בכל יום', 'each day'), byWeek ? tr('בכל שבוע', 'each week') : tr('בכל יום', 'each day')) + (st.metric === 'speed' && LANG === 'en' ? tr(' באנגלית', '') : '');
     $('#pg-summary').innerHTML = progressSummary(st.metric, pts, byWeek);
     progressChart($('#pg-chart'), pts, { metric: st.metric, start: from, end, byWeek });
   };

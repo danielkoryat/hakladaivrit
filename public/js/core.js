@@ -15,7 +15,7 @@ const contentCache = new Map();
 if (view.dataset.ssr) contentCache.set(view.dataset.ssr, Promise.resolve(view.innerHTML));
 function content(name) {
   if (!contentCache.has(name)) {
-    contentCache.set(name, fetch(`/content/${name}.html`).then(r => (r.ok ? r.text() : '')).catch(() => ''));
+    contentCache.set(name, fetch(`/content/${tr('', 'en/')}${name}.html`).then(r => (r.ok ? r.text() : '')).catch(() => ''));
   }
   return contentCache.get(name);
 }
@@ -43,7 +43,7 @@ const ICON = {
   zap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
   heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>',
-  next: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  next: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${tr('M15 18l-6-6 6-6', 'M9 18l6-6-6-6')}"/></svg>`,
   hand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
   trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a4 4 0 0 1-4 4M7 5H4v2a4 4 0 0 0 4 4"/></svg>',
@@ -57,16 +57,16 @@ const ICON = {
   sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>',
 };
 const starsHtml = (n, cls = '') =>
-  `<span class="stars ${cls}" aria-label="${n} כוכבים">${[1, 2, 3].map(i => `<span class="${i <= n ? 'on' : ''}">${ICON.star}</span>`).join('')}</span>`;
-const touchNote = () => isTouch ? '<p class="touch-note">האתר מיועד להקלדה במקלדת פיזית. חברו מקלדת כדי לתרגל.</p>' : '';
+  `<span class="stars ${cls}" aria-label="${n} ${tr('כוכבים', 'stars')}">${[1, 2, 3].map(i => `<span class="${i <= n ? 'on' : ''}">${ICON.star}</span>`).join('')}</span>`;
+const touchNote = () => isTouch ? `<p class="touch-note">${tr('האתר מיועד להקלדה במקלדת פיזית. חברו מקלדת כדי לתרגל.', 'This site is designed for typing on a physical keyboard. Connect a keyboard to practice.')}</p>` : '';
 const statBox = (label, value, big) => `<div class="stat${big ? ' big' : ''}"><div class="label">${label}</div><div class="value">${value}</div></div>`;
-const KIND_NAMES = { test: 'מבחן', lesson: 'שיעור', practice: 'תרגול', custom: 'שיעור אישי', text: 'טקסט' };
+const KIND_NAMES = { test: tr('מבחן', 'test'), lesson: tr('שיעור', 'lesson'), practice: tr('תרגול', 'practice'), custom: tr('שיעור אישי', 'custom lesson'), text: tr('טקסט', 'text') };
 
 function missedHtml(charStats) {
   const missed = Object.entries(charStats).filter(([, s]) => s[1] > 0).sort((a, b) => b[1][1] - a[1][1]).slice(0, 8);
-  if (!missed.length) return `<div class="missed"><div class="missed-title">אף טעות, כל הכבוד!</div></div>`;
-  return `<div class="missed"><div class="missed-title">מקשים שבהם טעיתם</div><div class="chips">${
-    missed.map(([ch, s]) => `<span class="chip">${ch === ' ' ? 'רווח' : esc(ch)} <span class="num">×${s[1]}</span></span>`).join('')
+  if (!missed.length) return `<div class="missed"><div class="missed-title">${tr('אף טעות, כל הכבוד!', 'Perfect, no mistakes!')}</div></div>`;
+  return `<div class="missed"><div class="missed-title">${tr('מקשים שבהם טעיתם', 'Keys with mistakes')}</div><div class="chips">${
+    missed.map(([ch, s]) => `<span class="chip">${ch === ' ' ? tr('רווח', 'space') : esc(ch)} <span class="num">×${s[1]}</span></span>`).join('')
   }</div></div>`;
 }
 
@@ -307,8 +307,8 @@ class Typer {
 function handsButton(onToggle) {
   const b = document.createElement('button');
   b.className = 'cfg-btn' + (Prefs.hands ? ' active' : '');
-  b.innerHTML = `${ICON.hand}<span>ידיים</span>`;
-  b.title = 'הצגת ידיים וירטואליות על המקלדת';
+  b.innerHTML = `${ICON.hand}<span>${tr('ידיים', 'hands')}</span>`;
+  b.title = tr('הצגת ידיים וירטואליות על המקלדת', 'Show virtual hands on the keyboard');
   b.onclick = () => { Prefs.hands = !Prefs.hands; b.classList.toggle('active', Prefs.hands); onToggle(); };
   return b;
 }
@@ -317,8 +317,8 @@ function handsButton(onToggle) {
 function blindButton(onToggle) {
   const b = document.createElement('button');
   b.className = 'cfg-btn' + (Prefs.blind ? ' active' : '');
-  b.innerHTML = `${ICON.eyeOff}<span>מצב עיוור</span>`;
-  b.title = 'הסתרת המקלדת שעל המסך. הרמז מופיע רק אם מתעכבים.';
+  b.innerHTML = `${ICON.eyeOff}<span>${tr('מצב עיוור', 'Blind mode')}</span>`;
+  b.title = tr('הסתרת המקלדת שעל המסך. הרמז מופיע רק אם מתעכבים.', 'Hide the on-screen keyboard. The hint appears only if you hesitate.');
   b.onclick = () => { Prefs.blind = !Prefs.blind; b.classList.toggle('active', Prefs.blind); onToggle(); };
   return b;
 }
@@ -326,8 +326,8 @@ function blindButton(onToggle) {
 function eyeStarsButton(onToggle) {
   const b = document.createElement('button');
   b.className = 'cfg-btn' + (Prefs.eyeStars ? ' active' : '');
-  b.innerHTML = `${ICON.star}<span>כוכבי עיניים</span>`;
-  b.title = 'מדי פעם מופיע כוכב מעל הטקסט. לחיצה על Enter בזמן שהוא מופיע נותנת נקודות.';
+  b.innerHTML = `${ICON.star}<span>${tr('כוכבי עיניים', 'Eye stars')}</span>`;
+  b.title = tr('מדי פעם מופיע כוכב מעל הטקסט. לחיצה על Enter בזמן שהוא מופיע נותנת נקודות.', 'A star appears over the text occasionally. Press Enter while it is showing to earn points.');
   b.onclick = () => { Prefs.eyeStars = !Prefs.eyeStars; b.classList.toggle('active', Prefs.eyeStars); onToggle(); };
   return b;
 }

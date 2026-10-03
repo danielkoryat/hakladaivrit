@@ -1,10 +1,17 @@
 'use strict';
 
+// ---------- Site language ----------
+// The site has two versions: Hebrew (/) and English (/en). The English one is written in
+// English and teaches only English typing; tr() picks a text for the version on screen.
+const SITE_LANG = /^\/en(\/|$)/.test(location.pathname) ? 'en' : 'he';
+const tr = (he, en) => (SITE_LANG === 'en' ? en : he);
+
 // ---------- Typing language ----------
-// The site teaches Hebrew by default; visitors can switch the exercises to English.
+// The Hebrew site teaches Hebrew by default; visitors can switch the exercises to English.
 // The choice is read once at load (switching reloads the page), so every other
 // script simply sees Hebrew or English data.
 const LANG = (() => {
+  if (SITE_LANG === 'en') return 'en';
   try {
     const q = new URLSearchParams(location.search).get('lang');
     if (q === 'en' || q === 'he') localStorage.setItem('hebtype.lang', JSON.stringify(q));
@@ -189,6 +196,69 @@ EN_SENTENCES.push(
   'After the storm, a bright rainbow filled the sky.',
   'Try to keep a steady rhythm instead of rushing.',
 );
+
+// The English course explained in English, for the English site. A group is given on the
+// first lesson of each group. worker/index.js reads this block too.
+const EN_LESSONS_EN = {
+  1: { group: 'Home row', title: 'Index and middle fingers: f j d k',
+    desc: 'Rest your left index finger on f and your right index finger on j. These two keys have a small bump, so you can find them without looking. Your middle fingers rest next to them, on d and k, and your thumbs on the space bar.' },
+  2: { title: 'Ring and little fingers: s l a ;',
+    desc: 'On the left hand the ring finger rests on s and the little finger on a. On the right hand the ring finger rests on l and the little finger on ;.' },
+  3: { title: 'g and h',
+    desc: 'The left index finger reaches right from f to g, and the right index finger reaches left from j to h. After every key press, return to the home row.' },
+  4: { title: 'Review: the home row',
+    desc: 'All the home row keys together, in words like all, ask, had and glass. Focus on accuracy and keep your eyes off the keyboard.' },
+  5: { group: 'The most common letters', title: 'e and i',
+    desc: 'e is the most common letter in English. The left middle finger moves up from d to e, and the right middle finger moves up from k to i.' },
+  6: { title: 'r and u',
+    desc: 'The index fingers move up to the top row: the left one from f to r, and the right one from j to u.' },
+  7: { title: 't and o',
+    desc: 'The left index finger reaches up and right to t, and the right ring finger moves up from l to o. From now on you can type the, to and that.' },
+  8: { title: 'Review: the common letters',
+    desc: 'The home row together with e i r u t o. With these letters you can already type more than 40% of the words in ordinary text.' },
+  9: { group: 'More letters', title: 'n and m',
+    desc: 'The right index finger moves down to the bottom row: to n, down and left of j, and to m, right below j.' },
+  10: { title: 'c and w',
+    desc: 'The left middle finger moves down from d to c, and the left ring finger moves up from s to w.' },
+  11: { title: 'y and p',
+    desc: 'The right index finger reaches up and left to y, and the right little finger moves up from ; to p.' },
+  12: { title: 'Review: most of the letters',
+    desc: 'Everything you have learned so far. With these letters you can type almost every common English word.' },
+  13: { group: 'The last letters', title: 'v and b',
+    desc: 'The left index finger moves down from f to v, and reaches down and right to b.' },
+  14: { title: 'x q z',
+    desc: 'The three rarest letters: the left ring finger moves down from s to x, and the left little finger moves up from a to q and down to z.' },
+  15: { title: 'Review: all the letters',
+    desc: 'All 26 letters of the English alphabet. You now know every letter on the keyboard!' },
+  16: { group: 'Capitals, punctuation and numbers', title: 'Capital letters (Shift)',
+    desc: 'For a capital letter, hold Shift with the other hand: a left-hand letter (like A) with the right Shift, and a right-hand letter (like J) with the left Shift.' },
+  17: { title: 'Period and comma',
+    desc: 'The comma is on the , key (right middle finger) and the period on the . key (right ring finger). A space comes after a comma and a period.' },
+  18: { title: 'Question mark and exclamation mark',
+    desc: 'The rule: Shift with the other hand. The question mark is Shift with the / key (right little finger), so hold the left Shift. The exclamation mark is Shift with 1 (left little finger), so hold the right Shift.' },
+  19: { title: 'Apostrophe, quotes and hyphen',
+    desc: 'The apostrophe (\') is next to ; under the right little finger, and it is part of common words: don\'t, it\'s, I\'m. Quotation marks (") are the left Shift with the same key. The hyphen (-) is under the right little finger, next to 0, in words like well-known.' },
+  20: { title: 'Numbers: left hand',
+    desc: 'The number row with the left hand: the little finger on 1, the ring finger on 2, the middle finger on 3 and the index finger on 4 and 5. Each finger reaches two rows up and returns to the home row.' },
+  21: { title: 'Numbers: right hand',
+    desc: 'With the right hand: the index finger on 6 and 7, the middle finger on 8, the ring finger on 9 and the little finger on 0. The lesson ends with numbers from both hands.' },
+  22: { group: 'Real typing', title: 'Common words',
+    desc: 'The most frequent words in English. The more you type them, the more each word becomes one smooth movement instead of a string of letters. In this lesson typing continues after a mistake, as in real typing: notice your mistakes and fix them with Backspace.' },
+  23: { title: 'Sentences',
+    desc: 'Full English sentences with capitals, spaces and punctuation, just like real typing. In this lesson typing continues after a mistake, as in real typing: notice your mistakes and fix them with Backspace.' },
+  24: { title: 'Quotes',
+    desc: 'Famous English quotes with full punctuation. In this lesson typing continues after a mistake, as in real typing: notice your mistakes and fix them with Backspace.' },
+};
+
+const FINGER_NAMES_EN = {
+  lp: 'left little finger', lr: 'left ring finger', lm: 'left middle finger', li: 'left index finger',
+  ri: 'right index finger', rm: 'right middle finger', rr: 'right ring finger', rp: 'right little finger', th: 'thumb',
+};
+
+if (SITE_LANG === 'en') {
+  EN_LESSONS.forEach(l => Object.assign(l, EN_LESSONS_EN[l.id]));
+  Object.assign(FINGER_NAMES, FINGER_NAMES_EN);
+}
 
 EN_LESSONS.forEach((l, i) => { if (!l.group) l.group = EN_LESSONS[i - 1].group; l.pid = 300 + l.id; });
 LESSONS.forEach(l => { l.pid = 200 + l.id; });

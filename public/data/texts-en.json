@@ -1,0 +1,163 @@
+{
+    "categories":  {
+                       "history":  "History",
+                       "science":  "Science and space",
+                       "nature":  "Nature and animals",
+                       "language":  "The English language"
+                   },
+    "texts":  [
+                  {
+                      "slug":  "history-typewriter",
+                      "category":  "history",
+                      "title":  "The typewriter and QWERTY layout",
+                      "audience":  "all",
+                      "level":  "Medium",
+                      "intro":  "Why are letters arranged in such a strange order on the keyboard?",
+                      "text":  "In 1868 American inventor Christopher Sholes patented a typewriter. Early machines had keys arranged in alphabetical order. According to popular legend, when people typed fast, the metal arms for each letter would jam together. So Sholes rearranged the keys so common letter pairs would be far apart. This created the QWERTY layout, named after the first six letters in the top row. In 1873 Remington began manufacturing the machine, and within decades it was in offices worldwide. Nearly 150 years later, most English keyboards still use the same arrangement."
+                  },
+                  {
+                      "slug":  "history-gutenberg",
+                      "category":  "history",
+                      "title":  "Gutenberg and the printing revolution",
+                      "audience":  "all",
+                      "level":  "Hard",
+                      "intro":  "The invention that turned books from luxuries into something anyone could buy.",
+                      "text":  "Around 1450 Johannes Gutenberg in Mainz, Germany built a printing press with movable metal letters that could be rearranged and reused. Before this every book was copied by hand, and copying a single book took months. With Gutenberg\u0027s method hundreds of copies of the same book could be printed. His most famous work is the Gutenberg Bible, written in Latin. The printing press made knowledge available to many people and changed the world. Books became cheaper and more common, spreading ideas faster than ever before in human history."
+                  },
+                  {
+                      "slug":  "history-dead-sea-scrolls",
+                      "category":  "history",
+                      "title":  "The Dead Sea Scrolls",
+                      "audience":  "all",
+                      "level":  "Medium",
+                      "intro":  "A lost goat led to one of the greatest archaeological discoveries in the world.",
+                      "text":  "In 1947 a young Bedouin shepherd searching for a lost goat threw a rock into a cave near the Dead Sea and heard pottery breaking. Inside the cave he found jars containing ancient scrolls. In the following years thousands of fragments from hundreds of manuscripts were discovered in caves near Qumran. Many are written in Hebrew and date back more than two thousand years. These scrolls include the oldest known copies of biblical texts. The Great Isaiah Scroll is now preserved at the Shrine of the Book in the Israel Museum in Jerusalem."
+                  },
+                  {
+                      "slug":  "history-moon-landing",
+                      "category":  "science",
+                      "title":  "Landing on the moon",
+                      "audience":  "all",
+                      "level":  "Easy",
+                      "intro":  "The summer when humans walked on another world for the first time.",
+                      "text":  "On July 20, 1969 the Apollo 11 spacecraft landed on the moon. Neil Armstrong was the first human to step on the lunar surface, followed by Buzz Aldrin. Their crewmate Michael Collins stayed in orbit circling the moon and waiting for them. When Armstrong descended the ladder he said words that went down in history: \u0027That\u0027s one small step for man, one giant leap for mankind.\u0027 Hundreds of millions of people watched on television. The astronauts collected rocks, set up instruments and a flag, and returned safely to Earth after eight days."
+                  },
+                  {
+                      "slug":  "history-great-pyramid",
+                      "category":  "history",
+                      "title":  "The Great Pyramid of Giza",
+                      "audience":  "all",
+                      "level":  "Medium",
+                      "intro":  "The structure that held the title of world\u0027s tallest building for thousands of years.",
+                      "text":  "The Great Pyramid of Giza in Egypt was built roughly 4,500 years ago for the king Khufu. It was originally about 146 meters tall and held the record as the world\u0027s tallest structure for about 3,800 years. The pyramid is made of over two million stone blocks, some weighing several tons. Scholars believe thousands of workers spent roughly twenty years building it, using ramps, sledges and simple tools. The Great Pyramid is the only one of the seven wonders of the ancient world still standing today."
+                  },
+                  {
+                      "slug":  "history-world-wide-web",
+                      "category":  "history",
+                      "title":  "How the World Wide Web was born",
+                      "audience":  "all",
+                      "level":  "Hard",
+                      "intro":  "The idea that connected the world started with a proposal from one scientist.",
+                      "text":  "In 1989 British scientist Tim Berners-Lee, working at CERN research lab in Switzerland, proposed a new way for computers to share information: pages linked together by hyperlinks. The World Wide Web was born. In 1991 the first website went online explaining how the web works. Berners-Lee and CERN decided the technology would be open and free for everyone to use. Because of this decision the web grew quickly, and today it contains billions of pages. It is hard to imagine the modern world without the internet."
+                  },
+                  {
+                      "slug":  "science-sun",
+                      "category":  "science",
+                      "title":  "Our sun",
+                      "audience":  "kids",
+                      "level":  "Easy",
+                      "intro":  "The star closest to us, and it is enormous.",
+                      "text":  "The sun is a star, just like the stars you see at night, but it is much closer to us. Light from the sun reaches Earth in about eight minutes. The sun is so huge that you could fit over one million Earths inside it. Earth orbits the sun, and one complete orbit takes about 365 days, which we call one year. During this time Earth also spins on its axis, and this spinning creates day and night. The sun gives us light and heat, making life on Earth possible."
+                  },
+                  {
+                      "slug":  "science-moon",
+                      "category":  "science",
+                      "title":  "Our neighbor in space: the moon",
+                      "audience":  "kids",
+                      "level":  "Easy",
+                      "intro":  "Why does the moon change shape, and what happened to the footprints on it?",
+                      "text":  "The moon is our closest neighbor in space, about 384,000 kilometers away. The moon does not make its own light: it reflects sunlight, which is why sometimes we see only part of it. There is no air or wind on the moon, so the footprints left by astronauts probably remain there to this day. Gravity on the moon is one-sixth as strong as on Earth, so if you jumped there you could jump much higher. The moon orbits Earth, which takes about 29 days."
+                  },
+                  {
+                      "slug":  "science-blue-sky",
+                      "category":  "science",
+                      "title":  "Why is the sky blue?",
+                      "audience":  "all",
+                      "level":  "Medium",
+                      "intro":  "And the reason why sunsets are orange.",
+                      "text":  "Sunlight appears white but is actually made of all the colors of the rainbow. When sunlight passes through the air it meets tiny gas particles. These particles scatter blue light much more than red or yellow light, so blue light reaches us from all directions in the sky. At sunset the light travels through a thicker layer of air. Most of the blue light scatters away during the journey, leaving mostly orange and red light. This is why sunsets are orange and red while the daytime sky is blue."
+                  },
+                  {
+                      "slug":  "science-dinosaurs",
+                      "category":  "science",
+                      "title":  "What happened to the dinosaurs?",
+                      "audience":  "kids",
+                      "level":  "Easy",
+                      "intro":  "They ruled Earth for over one hundred million years.",
+                      "text":  "Dinosaurs lived on Earth for over 150 million years. Among them were giant plant-eaters and fast meat-eating hunters with sharp teeth. About 66 million years ago most dinosaurs went extinct. Most scientists think a giant asteroid hit Earth, threw up clouds of dust that blocked out the sun and changed the climate worldwide. But not all dinosaurs disappeared: birds today are descendants of small dinosaurs, so in a way dinosaurs are still flying around us."
+                  },
+                  {
+                      "slug":  "nature-octopus",
+                      "category":  "nature",
+                      "title":  "The clever octopus",
+                      "audience":  "kids",
+                      "level":  "Easy",
+                      "intro":  "Three hearts, blue blood, and a brain that can open jars.",
+                      "text":  "The octopus has eight arms, three hearts and blue blood. It can change color in a second to hide from enemies or catch food. Octopuses have no bones and can squeeze through very small openings. They are intelligent animals: scientists have seen octopuses opening jars, solving mazes and even escaping from their tank at night. Each arm has a mind of its own and can taste. Octopuses are amazing hunters and among the most intelligent creatures in the ocean."
+                  },
+                  {
+                      "slug":  "nature-elephant",
+                      "category":  "nature",
+                      "title":  "The elephant and its amazing trunk",
+                      "audience":  "kids",
+                      "level":  "Easy",
+                      "intro":  "The largest land animal in the world, and its trunk does everything.",
+                      "text":  "The African elephant is the largest land animal in the world. An adult elephant can weigh over six tons. The trunk of an elephant is actually its nose and upper lip joined together, and it contains tens of thousands of muscles. With its trunk the elephant smells, drinks, picks things up and even pets its friends. Elephants have excellent memory and live in family groups led by the oldest female. They are highly intelligent and can communicate with each other over long distances."
+                  },
+                  {
+                      "slug":  "nature-hummingbird",
+                      "category":  "nature",
+                      "title":  "The hummingbird: the bird that flies backwards",
+                      "audience":  "kids",
+                      "level":  "Easy",
+                      "intro":  "A tiny bird with wings that hum.",
+                      "text":  "The hummingbird is one of the smallest birds in the world. It flaps its wings dozens of times per second, so fast they make a humming sound. The hummingbird can fly forward, backward, up, down and hover in one spot like a helicopter. It feeds on flower nectar and visits hundreds of flowers each day to get enough energy. The hummingbird\u0027s heart beats very fast and its body temperature is high. These tiny birds are amazing fliers and built for speed and maneuverability."
+                  },
+                  {
+                      "slug":  "nature-honeybees",
+                      "category":  "nature",
+                      "title":  "The dance of the honeybees",
+                      "audience":  "kids",
+                      "level":  "Easy",
+                      "intro":  "How a bee tells other bees where to find flowers.",
+                      "text":  "Honeybees live in hives with tens of thousands of other bees. When a bee finds a field of flowers it returns to the hive and performs a special dance. The direction of the dance and its length tell the other bees which way to fly and how far. Bees collect nectar and pollen from flowers, and as they do they move pollen from flower to flower. Without bees many plants could not make fruit and seeds. Bees are essential to nature and to humans."
+                  },
+                  {
+                      "slug":  "language-english-history",
+                      "category":  "language",
+                      "title":  "The alphabet and where English letters came from",
+                      "audience":  "all",
+                      "level":  "Hard",
+                      "intro":  "Our 26 letters have a history that goes back thousands of years.",
+                      "text":  "The English alphabet has 26 letters that come from Latin, which came from Greek, which came from Phoenician. The Phoenicians were traders around 1200 BC, and they created one of the first alphabets. The letter A comes from the Phoenician word for ox, and was drawn as an upside-down oxhead. B comes from the word for house, and the shape looked like a house. C comes from the word for camel. Over thousands of years the pictures became simpler and eventually became the abstract letters we write today. Language constantly evolves."
+                  },
+                  {
+                      "slug":  "language-shakespeare-words",
+                      "category":  "language",
+                      "title":  "Words invented by Shakespeare",
+                      "audience":  "all",
+                      "level":  "Medium",
+                      "intro":  "The playwright created many words we still use today.",
+                      "text":  "William Shakespeare wrote plays and poems around 400 years ago. Many words we use today were invented or first used by Shakespeare. He created words like bedroom, eyeball, fashionable, gossip, lonely, excitement and bandit. He also invented new word combinations and used words in new ways. Shakespeare was so creative with language that he used about 31,000 different words in his works, far more than most writers. His influence on English is huge: many phrases from his plays are still common today."
+                  },
+                  {
+                      "slug":  "language-english-spelling",
+                      "category":  "language",
+                      "title":  "Why English spelling is so strange",
+                      "audience":  "all",
+                      "level":  "Medium",
+                      "intro":  "English spelling rules seem to have more exceptions than rules.",
+                      "text":  "English spelling seems crazy because English is not one language: it is a mixture. English borrowed words from French, Latin, Greek and other languages, and each brought its own spelling rules. The word \u0027knight\u0027 has a silent \u0027k\u0027 and silent \u0027gh\u0027 because it came from Old English where those letters were pronounced. The word \u0027tough\u0027 and \u0027though\u0027 sound different but have similar spelling because English pronunciation changed over centuries but spelling did not. Learning to spell English means memorizing many special cases. But English is still one of the easiest languages to read."
+                  }
+              ]
+}
