@@ -32,9 +32,6 @@ const Prefs = {
   // Blind mode hides the on-screen keyboard in lessons, so the help fades out.
   get blind() { return Store.get('blind', false); },
   set blind(v) { Store.set('blind', !!v); },
-  // Eye stars: signals over the text that reward keeping the eyes on the screen.
-  get eyeStars() { return Store.get('eyeStars', true); },
-  set eyeStars(v) { Store.set('eyeStars', !!v); },
 };
 
 const ICON = {
@@ -322,13 +319,3 @@ function blindButton(onToggle) {
   b.onclick = () => { Prefs.blind = !Prefs.blind; b.classList.toggle('active', Prefs.blind); onToggle(); };
   return b;
 }
-
-function eyeStarsButton(onToggle) {
-  const b = document.createElement('button');
-  b.className = 'cfg-btn' + (Prefs.eyeStars ? ' active' : '');
-  b.innerHTML = `${ICON.star}<span>${tr('כוכבי עיניים', 'Eye stars')}</span>`;
-  b.title = tr('מדי פעם מופיע כוכב מעל הטקסט. לחיצה על Enter בזמן שהוא מופיע נותנת נקודות.', 'A star appears over the text occasionally. Press Enter while it is showing to earn points.');
-  b.onclick = () => { Prefs.eyeStars = !Prefs.eyeStars; b.classList.toggle('active', Prefs.eyeStars); onToggle(); };
-  return b;
-}
-

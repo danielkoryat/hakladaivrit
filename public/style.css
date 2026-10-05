@@ -343,32 +343,6 @@ details p { margin: .6rem 0 0 !important; color: var(--c-sub-alt); }
 .stage.blind .hint { opacity: 0; transition: opacity .3s; }
 .stage.blind .hint.reveal { opacity: 1; }
 
-/* Eye stars: a short signal just above the text; Enter catches it. */
-.stage { position: relative; }
-.eye-star {
-  position: absolute;
-  translate: 0 -120%;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: .35rem;
-  padding: .2rem .65rem;
-  border-radius: 999px;
-  background: var(--c-gold-100);
-  color: var(--c-gold-text);
-  font-size: .85rem;
-  font-weight: 600;
-  pointer-events: none;
-  animation: eye-in .25s ease-out;
-}
-.eye-star svg { width: 18px; height: 18px; color: var(--c-gold); }
-.eye-star.gone { opacity: 0; transition: opacity .3s; }
-.eye-star.caught { animation: eye-caught .45s ease-out forwards; }
-@keyframes eye-in { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
-@keyframes eye-caught { to { opacity: 0; scale: 1.8; } }
-.eye-note { color: var(--c-sub-alt); margin: -.4rem 0 1rem; }
-.eye-note svg { width: 16px; height: 16px; color: var(--c-gold); vertical-align: -2px; }
-
 /* Letter unlocking: one tile per letter, filled from the bottom by its progress. */
 .ad-panel { margin: 0 auto 1rem; max-width: 1000px; text-align: center; }
 .ad-letters { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem; }

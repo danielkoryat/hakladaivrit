@@ -86,7 +86,7 @@ const Gamify = {
     const correct = r.correct != null ? r.correct : Math.round((r.wpm * 5 * r.secs) / 60);
     switch (r.kind) {
       case 'test': return Math.round(correct / 8) + (r.acc >= 95 ? 10 : 0);
-      case 'lesson': return 15 + (r.stars || 1) * 10 + (r.eyes || 0) * 3;
+      case 'lesson': return 15 + (r.stars || 1) * 10;
       case 'custom': return 15 + Math.round(correct / 10);
       case 'text': return 10 + Math.round(correct / 6);
       case 'game': return Math.round(r.score / 15);

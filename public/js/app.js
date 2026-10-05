@@ -352,7 +352,7 @@
   }
 
   // ---------- Lesson runner (regular and personalised lessons) ----------
-  function runLesson({ docTitle, meta, title, desc, focusKeys, dimTo, makeText, target, save, next, strict = true, eyeStars = false, about = '' }) {
+  function runLesson({ docTitle, meta, title, desc, focusKeys, dimTo, makeText, target, save, next, strict = true, about = '' }) {
     document.title = docTitle;
     view.innerHTML = `
       <section class="page">
@@ -383,38 +383,6 @@
       if (typer) update(typer);
     }
     $('#tools').append(handsButton(buildKeyboard), blindButton(buildKeyboard));
-    if (eyeStars) $('#tools').append(eyeStarsButton(scheduleStar));
-
-    // Eye stars (after Yechiam et al., 2003): now and then a star shows above the text for a
-    // moment, and Enter catches it for bonus XP. Only eyes on the screen notice it, so keeping
-    // them there pays off more than glancing down at the keys.
-    const eyes = { timer: 0, el: null, shown: 0, caught: 0 };
-    function scheduleStar() {
-      clearTimeout(eyes.timer);
-      if (eyeStars && Prefs.eyeStars) eyes.timer = setTimeout(showStar, 6000 + rand(9000));
-    }
-    function showStar() {
-      // Only while typing: started, not finished, and a key pressed in the last 3 seconds.
-      if (!typer || !typer.startTime || typer.finished || performance.now() - typer.lastKey > 3000) { scheduleStar(); return; }
-      const tb = $('#tb');
-      const el = document.createElement('div');
-      el.className = 'eye-star';
-      el.innerHTML = `${ICON.star}<span>Enter</span>`;
-      el.style.top = `${tb.offsetTop}px`;
-      el.style.insetInlineStart = `${10 + rand(70)}%`;
-      $('#stage').append(el);
-      eyes.el = el;
-      eyes.shown++;
-      setTimeout(() => { if (eyes.el === el) { dropStar('gone'); scheduleStar(); } }, 2500);
-    }
-    function dropStar(cls) {
-      const el = eyes.el;
-      eyes.el = null;
-      if (!el) return;
-      el.classList.add(cls);
-      setTimeout(() => el.remove(), 500);
-    }
-    function stopStars() { clearTimeout(eyes.timer); dropStar('gone'); }
 
     function update(tp) {
       const ch = tp.nextChar();
@@ -434,8 +402,6 @@
       $('#stage').hidden = false;
       if (typer) typer.destroy();
       typer = null;
-      stopStars();
-      Object.assign(eyes, { shown: 0, caught: 0 });
       buildKeyboard();
       typer = new Typer({
         el: $('#tb'),
@@ -445,19 +411,13 @@
         onPress: (code, ok) => kb.flash(code, ok),
         onFinish: finish,
       });
-      scheduleStar();
     }
 
     function finish(s, tp) {
-      stopStars();
       const wpm = Math.round(s.wpm);
       const acc = Math.round(s.acc);
       const stars = acc >= 97 && wpm >= target ? 3 : acc >= 92 ? 2 : 1;
-      const { reward } = save(tp, stars, eyes.caught);
-      const eyeNote = !eyes.shown ? ''
-        : `<p class="eye-note">${ICON.star} ${tr('תפסתם', 'You caught')} ${eyes.caught} ${tr('מתוך', 'out of')} ${eyes.shown} ${tr('כוכבי עיניים', 'eye stars')}${eyes.caught ? ` (+${eyes.caught * 3} ${tr('נקודות', 'points')})` : ''}. ${eyes.caught === eyes.shown
-          ? tr('העיניים נשארו על המסך, בדיוק כמו שצריך.', 'Your eyes stayed on the text, exactly as they should.')
-          : tr('כוכב שפוספס הוא בדרך כלל סימן שהעיניים ירדו למקלדת.', 'A missed star usually means your eyes dropped to the keyboard.')}</p>`;
+      const { reward } = save(tp, stars);
       const note = stars === 3 ? tr('מעולה! עברתם את השיעור בהצטיינות.', 'Excellent! You completed the lesson perfectly.')
         : stars === 2 ? tr(`יפה מאוד. לשלושה כוכבים: דיוק של 97% ומעלה ולפחות ${target} מילים לדקה.`, `Very good. For three stars: 97% accuracy or higher and at least ${target} words per minute.`)
         : tr('סיימתם את השיעור! נסו שוב והתמקדו בדיוק, לאט ובטוח.', 'You completed the lesson! Try again and focus on accuracy—slow and steady.');
@@ -468,7 +428,6 @@
         ${starsHtml(stars, 'big')}
         <h2 class="result-title">${tr('הושלם', 'Completed')}: ${esc(title)}</h2>
         <p class="result-note">${note}</p>
-        ${eyeNote}
         <div class="result-top">
           ${statBox(tr('מילים לדקה', 'Words per minute'), wpm, true)}
           ${statBox(tr('דיוק', 'Accuracy'), acc + '%', true)}
@@ -501,11 +460,10 @@
 
     Page.onKey = e => {
       if (e.key === 'Tab' || e.key === 'Escape') { e.preventDefault(); start(); return; }
-      if (e.key === 'Enter' && eyes.el) { e.preventDefault(); eyes.caught++; dropStar('caught'); scheduleStar(); return; }
       if (!$('#stage').hidden && typer) typer.handleKey(e);
       else if (e.key === 'Enter' && next) navigate(next.href);
     };
-    Page.onLeave = () => { clearTimeout(hintTimer); stopStars(); if (typer) typer.destroy(); };
+    Page.onLeave = () => { clearTimeout(hintTimer); if (typer) typer.destroy(); };
     start();
   }
 
@@ -580,12 +538,10 @@
       dimTo: lesson.type ? null : [...lessonKeys(idx), ' '],
       makeText: () => lessonText(lesson, idx),
       target: lesson.target,
-      save: (tp, stars, eyes) => Account.record(tp.report({ kind: 'lesson', mode: `lesson-${lesson.pid}`, label: SITE_LANG === 'en' ? `Lesson ${id}` : `שיעור ${id}${LANG === 'en' ? ' · אנגלית' : ''}`, lessonId: lesson.pid, stars, eyes })),
+      save: (tp, stars) => Account.record(tp.report({ kind: 'lesson', mode: `lesson-${lesson.pid}`, label: SITE_LANG === 'en' ? `Lesson ${id}` : `שיעור ${id}${LANG === 'en' ? ' · אנגלית' : ''}`, lessonId: lesson.pid, stars })),
       next: nextLesson ? { href: `/lesson/${nextLesson.id}`, label: tr('לשיעור הבא', 'Next lesson') } : { href: '/profile', label: tr('לניתוח הביצועים', 'Performance analysis') },
       // The real-typing lessons let you type past a mistake and fix it, as in real typing.
       strict: !lesson.free,
-      // Eye stars start after the home row, once there is something to look away from.
-      eyeStars: idx >= 4,
       about: lessonAbout(lesson, idx),
     });
   }

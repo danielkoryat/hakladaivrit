@@ -133,11 +133,6 @@ A review lesson practises everything taught so far, with extra weight on the key
 Blind mode (a button in every lesson) hides the on-screen keyboard and shows the finger hint
 only after a 1.5 second hesitation, so the help can fade out as the keys become familiar.
 
-Eye stars, from lesson 5 on: every 6 to 15 seconds of active typing, a star shows just above the
-text for 2.5 seconds, and pressing Enter while it shows catches it for 3 bonus XP. It follows
-Yechiam et al. (2003), where a secondary task with signals on the screen kept trainees from
-going back to looking at the keys. The results show how many stars were caught.
-
 Letter lessons stop on every mistake until the right key is pressed. The real-typing lessons
 (`free: true`: common words, prefixes, sentences, quotations) let the user type past a mistake
 and fix it with Backspace, as in real typing.
@@ -168,7 +163,7 @@ against the paper itself (abstract or full text), and each row says what the sit
 | Typists can trade speed for accuracy, but most of the trade-off happens at the keystroke level, and pushing for speed costs many errors. | Yamaguchi, Crump & Logan (2013), "Speed–accuracy trade-off in skilled typewriting", *J. Exp. Psychology: Human Perception and Performance* 39(3). [doi:10.1037/a0030512](https://doi.org/10.1037/a0030512) | Accuracy first: letter lessons stop on every mistake, and 3 stars need 97% accuracy. |
 | Self-taught typists can be as fast as touch typists. The three predictors of speed are a consistent finger for each letter, preparing upcoming keystrokes, and little hand movement. | Feit, Weir & Oulasvirta (2016), "How we type: Movement strategies and performance in everyday typing", CHI 2016. [Project page](https://userinterfaces.aalto.fi/how-we-type/) | Each new key is drilled from the home key of its own finger (`חוח` for ו), and the hint names the finger for every key. |
 | Pairs of letters typed by different hands or fingers predict typing speed; overlapping key presses (rollover) are common among fast typists. | Dhakal, Feit, Kristensson & Oulasvirta (2018), "Observations on typing from 136 million keystrokes", CHI 2018. [doi:10.1145/3173574.3174220](https://doi.org/10.1145/3173574.3174220) | Drills pair keys of the two hands (כ with ח), and lessons move to real words, which are full of common letter pairs. |
-| Success in touch-typing training does not ensure its use afterwards: learners go back to looking at the keys because it gives better results in the moment. A secondary task with signals on the screen made looking at the screen worth more and helped trainees keep and maintain the skill. | Yechiam, Erev, Yehene & Gopher (2003), "Melioration and the transition from touch-typing training to everyday use", *Human Factors* 45(4). Technion. [doi:10.1518/hfes.45.4.671.27085](https://doi.org/10.1518/hfes.45.4.671.27085) | Eye stars: a short signal above the text that Enter catches for bonus XP. Blind mode hides the on-screen keyboard. |
+| Success in touch-typing training does not ensure its use afterwards: learners go back to looking at the keys because it gives better results in the moment. A secondary task with signals on the screen made looking at the screen worth more and helped trainees keep and maintain the skill. | Yechiam, Erev, Yehene & Gopher (2003), "Melioration and the transition from touch-typing training to everyday use", *Human Factors* 45(4). Technion. [doi:10.1518/hfes.45.4.671.27085](https://doi.org/10.1518/hfes.45.4.671.27085) | Blind mode hides the on-screen keyboard. |
 | Hiding the hands made skilled typists slower between keystrokes, and without on-screen echo they noticed their own errors less accurately. | Snyder, Logan & Yamaguchi (2015), "Watch what you type", *Attention, Perception & Psychophysics* 77(1). [doi:10.3758/s13414-014-0756-6](https://doi.org/10.3758/s13414-014-0756-6) | Visual help fades step by step instead of disappearing at once: blind mode still shows the hint after a hesitation, and typed text is always marked on screen. |
 | In a 14-lesson touch-typing program at the Hebrew University, typical students were *slower* at the end of the program; three months later, both groups had become significantly faster than before, with accuracy above 95%. | Weigelt Marom & Weintraub (2015), "The effect of a touch-typing program on keyboarding skills of higher education students with and without learning disabilities", *Research in Developmental Disabilities* 47. [doi:10.1016/j.ridd.2015.09.014](https://doi.org/10.1016/j.ridd.2015.09.014) | The lessons page and the guide tell learners to expect a temporary slowdown, and not to go back to looking at the keys. |
 | Postal workers learning to type learned fastest with one hour a day; longer or more intense sessions learned more slowly. | Baddeley & Longman (1978), "The influence of length and frequency of training session on the rate of learning to type", *Ergonomics* 21(8). [doi:10.1080/00140137808931764](https://doi.org/10.1080/00140137808931764) | The guide recommends short daily practice (15 to 20 minutes) rather than long sessions. |
@@ -207,7 +202,7 @@ against the paper itself (abstract or full text), and each row says what the sit
 No published study compares a frequency-based key order with a row-by-row order, in Hebrew or
 in any language. The order is supported indirectly: by the word-level studies above, by the
 coverage measurements, and by typing.com. The exact parameters are design choices, not research
-results: two keys per lesson, the star thresholds, and the timing, key and bonus of the eye stars.
+results: two keys per lesson and the star thresholds.
 
 ## Analysis and personalised lessons
 
