@@ -130,6 +130,8 @@ function viewGame() {
     overlay.hidden = true;
     area.querySelectorAll('.balloon, .pop').forEach(b => b.remove());
     st = { running: true, score: 0, hearts: 3, level: 1, combo: 0, pops: 0, keys: 0, good: 0, balloons: [], lock: null, spawnIn: 300, last: performance.now() };
+    const round = st;
+    Track.begin(round, () => ({ score: round.score, level: round.level }), { mode });
     hud();
     raf = requestAnimationFrame(tick);
   }
@@ -284,6 +286,7 @@ function viewGame() {
 
   function gameOver() {
     stop();
+    Track.end(st);
     const acc = st.keys ? Math.round((st.good / st.keys) * 100) : 100;
     const { reward, isBest } = Account.recordGame({ mode, score: st.score, level: st.level });
     const beat = challenge && st.score > challenge.value;

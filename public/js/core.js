@@ -79,6 +79,7 @@ class Typer {
   }
 
   reset(text) {
+    if (this.startTime && !this.finished) Track.abandon(this, 'restart');
     clearInterval(this.timer);
     Object.assign(this, {
       pos: 0, typed: [], keystrokes: 0, correctKeys: 0, errors: 0, lastKey: null,
@@ -170,6 +171,7 @@ class Typer {
   start() {
     this.startTime = performance.now();
     this.el.classList.remove('idle');
+    Track.begin(this, () => ({ chars: this.pos, errors: this.errors }));
     this.timer = setInterval(() => {
       if (this.timeLimit && (performance.now() - this.startTime) / 1000 >= this.timeLimit) this.finish(true);
       else this.o.onTick && this.o.onTick(this);
@@ -181,6 +183,7 @@ class Typer {
     this.finished = true;
     clearInterval(this.timer);
     this.endTime = timedOut ? this.startTime + this.timeLimit * 1000 : performance.now();
+    Track.end(this);
     this.o.onFinish && this.o.onFinish(this.stats(), this);
   }
 
@@ -297,7 +300,10 @@ class Typer {
     }
   }
 
-  destroy() { clearInterval(this.timer); }
+  destroy() {
+    clearInterval(this.timer);
+    if (this.startTime && !this.finished) Track.abandon(this, 'restart'); // leaving the page is logged by the router
+  }
 }
 
 // ---------- Shared typing page pieces ----------

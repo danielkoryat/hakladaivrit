@@ -31,6 +31,7 @@
 
   let renderedPath = null;
   function route() {
+    Track.abandon(null, 'left');
     if (Page.onLeave) Page.onLeave();
     Page.onLeave = null;
     Page.onKey = null;
@@ -59,6 +60,7 @@
     if (!location.hash) window.scrollTo(0, 0);
     Ads.fill();
     Analytics.page(location.pathname);
+    Track.view();
   }
   // Jumping to a section of the same page (#faq) shouldn't re-render it.
   window.addEventListener('popstate', () => { if (location.pathname !== renderedPath) route(); });
@@ -1119,6 +1121,131 @@
 
     renderRange();
     load();
+    activityPanel(view.querySelector('section.page'));
+  }
+
+  // Who did what on one day: everyone active that day (accounts and anonymous browsers) with
+  // their actions in order, and each person's full history on request.
+  function activityPanel(page) {
+    const num = v => Number(v || 0).toLocaleString(tr('he-IL', 'en-US'));
+    const timeOf = (ts, tz) => new Date(ts).toLocaleTimeString(tr('he-IL', 'en-GB'), { timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const dayOf = (ts, tz) => new Date(ts).toLocaleDateString('en-CA', { timeZone: tz });
+    const longDay = d => new Date(`${d}T12:00:00Z`).toLocaleDateString(tr('he-IL', 'en-US'), { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const shiftDay = (d, by) => new Date(Date.parse(`${d}T12:00:00Z`) + by * 86400000).toISOString().slice(0, 10);
+    const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
+    const regions = (() => { try { return new Intl.DisplayNames([tr('he', 'en')], { type: 'region' }); } catch { return null; } })();
+    const country = c => { try { return (regions && regions.of(c)) || c; } catch { return c; } };
+    const DEVICES = { mobile: tr('נייד', 'Phone'), tablet: tr('טאבלט', 'Tablet'), desktop: tr('מחשב', 'Computer') };
+    const WHY = { left: tr('מעבר לדף אחר', 'went to another page'), restart: tr('התחלה מחדש', 'started over'), closed: tr('סגירת הדף', 'closed the page') };
+    const secs = s => `${num(s)} ${tr('שנ׳', 's')}`;
+
+    function describe(e) {
+      const d = e.data || {};
+      const path = `<span class="act-path" dir="ltr">${esc(e.path || '')}</span>`;
+      switch (e.type) {
+        case 'view': return `${tr('צפייה ב־', 'Viewed ')}${path}${d.title ? ` <span class="muted">${esc(String(d.title).split(' | ')[0])}</span>` : ''}`;
+        case 'start': return `▶ ${tr('התחלה', 'Started')} ${path}${d.mode ? ` (${esc(d.mode)})` : ''}`;
+        case 'finish': return d.kind === 'game'
+          ? `✔ ${tr('משחק הבלונים', 'Balloon game')} (${esc(d.mode || '')}): <b>${num(d.score)}</b> ${tr('נקודות', 'points')}, ${tr('שלב', 'level')} ${num(d.level)}`
+          : `✔ ${tr('סיום', 'Finished')} ${esc(d.label || KIND_NAMES[d.kind] || '')}: <b>${num(d.wpm)}</b> ${tr('מילים לדקה', 'WPM')} · ${num(d.acc)}% ${tr('דיוק', 'accuracy')} · ${secs(d.secs)}${d.stars ? ` · ${'★'.repeat(d.stars)}` : ''}`;
+        case 'abandon': return `✖ ${tr('יציאה באמצע', 'Left midway')} ${path} ${tr('אחרי', 'after')} ${secs(d.secs)}`
+          + (d.score != null ? ` · ${num(d.score)} ${tr('נקודות', 'points')}` : ` · ${num(d.chars)} ${tr('תווים', 'characters')}`)
+          + ` <span class="muted">(${WHY[d.why] || esc(d.why || '')})</span>`;
+        case 'sign_up': return `★ ${tr('הרשמה לאתר', 'Signed up')}`;
+        case 'login': return tr('התחברות', 'Signed in');
+        case 'logout': return tr('התנתקות', 'Signed out');
+        case 'share': return `${tr('שיתוף', 'Shared')} (${esc(d.method || '')})`;
+        case 'site': return `${tr('מעבר לאתר ב', 'Switched to the ')}${d.to === 'en' ? tr('אנגלית', 'English site') : tr('עברית', 'Hebrew site')}`;
+        default: return esc(e.type);
+      }
+    }
+    const timeline = (events, tz) => `<ol class="act-list">${events.map(e =>
+      `<li><span class="act-time num">${timeOf(e.at, tz)}</span><span>${describe(e)}</span></li>`).join('')}</ol>`;
+
+    function personHtml(p, tz, day) {
+      const ev = p.events;
+      const count = t => ev.filter(e => e.type === t).length;
+      const who = p.email
+        ? `<b>${esc(p.name || p.email)}</b> <span class="muted num">${esc(p.email)}</span>`
+        : `<b>${tr('מבקר/ת אנונימי/ת', 'Anonymous visitor')}</b> <span class="muted num">#${esc(p.key.slice(1, 7))}</span>`;
+      const fresh = p.joined ? dayOf(p.joined, tz) === day : p.visitors.some(v => dayOf(v.firstSeen, tz) === day);
+      const badge = fresh ? ` <span class="act-badge">${p.joined ? tr('נרשם/ה היום', 'Joined today') : tr('ביקור ראשון', 'First visit')}</span>` : '';
+      const where = p.visitors.map(v => [[v.city, v.country && country(v.country)].filter(Boolean).join(', '), DEVICES[v.device] || v.device, v.browser, v.os].filter(Boolean).map(esc).join(' · ')).join(' / ');
+      const ref = p.visitors.map(v => v.referrer).filter(Boolean)[0];
+      const stats = [
+        `${timeOf(ev[0].at, tz)}–${timeOf(ev[ev.length - 1].at, tz)}`,
+        `${num(count('view'))} ${tr('דפים', 'pages')}`,
+        `${num(count('finish'))} ${tr('הושלמו', 'finished')}`,
+        count('abandon') ? `${num(count('abandon'))} ${tr('יציאות באמצע', 'left midway')}` : '',
+      ].filter(Boolean).join(' · ');
+      return `<details class="act-person">
+        <summary>
+          <span class="act-who">${who}${badge}</span>
+          <span class="act-meta">${where}${ref ? ` · ${tr('הגיע/ה מ־', 'came from ')}<span dir="ltr">${esc(host(ref))}</span>` : ''}</span>
+          <span class="act-meta num">${stats}</span>
+        </summary>
+        <div class="act-events">${timeline(ev, tz)}
+          <button class="btn small" data-history="${esc(p.key)}">${tr('כל ההיסטוריה', 'Full history')}</button>
+        </div>
+      </details>`;
+    }
+
+    function historyHtml(p, tz) {
+      const days = new Map();
+      p.events.forEach(e => { const d = dayOf(e.at, tz); (days.get(d) || days.set(d, []).get(d)).push(e); });
+      return [...days].reverse().map(([d, ev]) => `<h3 class="act-day">${longDay(d)}</h3>${timeline(ev, tz)}`).join('');
+    }
+
+    const el = document.createElement('div');
+    el.className = 'panel';
+    el.innerHTML = `
+      <div class="act-head">
+        <div><h2>${tr('מי עשה מה', 'Who did what')}</h2><p class="panel-sub" id="act-sub"></p></div>
+        <div class="act-nav">
+          <button class="cfg-btn" data-step="-1">${tr('יום קודם', 'Previous day')}</button>
+          <input type="date" id="act-day">
+          <button class="cfg-btn" data-step="1" id="act-next">${tr('יום הבא', 'Next day')}</button>
+        </div>
+      </div>
+      <div id="act-body"><p class="muted">${tr('טוען…', 'Loading…')}</p></div>`;
+    page.append(el);
+    const input = $('#act-day', el), body = $('#act-body', el);
+    let day = null;
+
+    async function load(d) {
+      let a;
+      try { a = await Api.req('GET', `/admin/activity${d ? `?day=${d}` : ''}`); } catch (e) {
+        body.innerHTML = `<p class="muted">${esc(e.message)}</p>`;
+        return;
+      }
+      if (!el.isConnected) return;
+      day = a.day;
+      input.value = a.day;
+      input.max = a.today;
+      $('#act-next', el).disabled = a.day >= a.today;
+      const signedIn = a.people.filter(p => p.email).length;
+      $('#act-sub', el).textContent = `${longDay(a.day)} · ${num(a.people.length)} ${tr('אנשים', 'people')} (${num(signedIn)} ${tr('מחוברים', 'signed in')}, ${num(a.people.length - signedIn)} ${tr('אנונימיים', 'anonymous')}) · ${tr('שעון', 'times in')} ${a.tz}`;
+      body.innerHTML = a.people.length
+        ? a.people.map(p => personHtml(p, a.tz, a.day)).join('')
+        : `<p class="muted">${tr('אין פעילות ביום הזה', 'No activity on this day')}</p>`;
+    }
+
+    el.addEventListener('click', async e => {
+      const step = e.target.closest('[data-step]');
+      if (step && day) { load(shiftDay(day, Number(step.dataset.step))); return; }
+      const h = e.target.closest('[data-history]');
+      if (!h) return;
+      h.disabled = true;
+      try {
+        const r = await Api.req('GET', `/admin/person?key=${encodeURIComponent(h.dataset.history)}`);
+        h.closest('.act-events').innerHTML = historyHtml(r.person, r.tz);
+      } catch (err) {
+        h.disabled = false;
+        toast(err.message, true);
+      }
+    });
+    input.addEventListener('change', () => { if (input.value) load(input.value); });
+    load();
   }
 
   // ---------- Guide ----------
@@ -1157,6 +1284,7 @@
           <li><strong>User account</strong>: Sign-in is through Google. We receive your email, name, and account ID only—not your password.</li>
           <li><strong>Results and practice</strong>: Speed, accuracy, time per keystroke for each key, and words you misspelled, so we can show you analysis and build personalized lessons. Guests: data stays in your browser only.</li>
           <li><strong>Usage statistics</strong>: We use Google Analytics to understand how many people visit the site, which pages are viewed, and where visitors come from. Google Analytics uses cookies and collects information like device type, browser, approximate location, and IP address (shortened). You can read about <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">how Google uses information</a> and install the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics opt-out browser extension</a>. If you enable Global Privacy Control in your browser, Google Analytics won't load.</li>
+          <li><strong>Activity log</strong>: We keep our own record of what happens on the site: pages opened, typing sessions and games started, finished or left midway (with their results), sign-ins and shares, with the time, approximate location (city and country), device type, browser and the site you came from. A random identifier in a cookie (<code>vid</code>) connects one browser's visits; if you sign in, they're linked to your account. Only the site's admins can see this log, it's used to understand and improve the site, and it's deleted after a year. It isn't collected if your browser sends Global Privacy Control.</li>
         </ul>
 
         <h2>Ads</h2>
@@ -1178,6 +1306,7 @@
           <li><strong>חשבון משתמש</strong>: ההתחברות נעשית עם Google. אנו מקבלים מ־Google את כתובת האימייל, השם ומזהה החשבון בלבד, לא את הסיסמה שלכם.</li>
           <li><strong>תוצאות ותרגול</strong>: מהירות, דיוק, זמני הקשה לכל מקש ומילים שבהן טעיתם, כדי להציג לכם ניתוח ולבנות שיעורים מותאמים אישית. אורחים: הנתונים נשמרים רק בדפדפן שלכם.</li>
           <li><strong>סטטיסטיקות שימוש</strong>: אנו משתמשים ב־Google Analytics כדי להבין כמה אנשים מבקרים באתר, אילו דפים נצפים ומאיפה מגיעים. Google Analytics משתמש בקובצי Cookie ואוסף מידע כמו סוג המכשיר, הדפדפן, מיקום משוער וכתובת ה־IP (מקוצרת). אפשר לקרוא על <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">האופן שבו Google משתמשת במידע</a> ולהתקין את <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">תוסף הביטול של Google Analytics</a>. אם הפעלתם בדפדפן Global Privacy Control, Google Analytics לא ייטען.</li>
+          <li><strong>יומן פעילות</strong>: אנו שומרים רישום משלנו של מה שקורה באתר: אילו דפים נפתחו, אימונים ומשחקים שהתחילו, הסתיימו או נעזבו באמצע (עם התוצאות), התחברויות ושיתופים, יחד עם השעה, מיקום משוער (עיר ומדינה), סוג המכשיר, הדפדפן והאתר שממנו הגעתם. מזהה אקראי בקובץ Cookie (<code>vid</code>) מקשר בין הביקורים מאותו דפדפן, ואם תתחברו הם יקושרו לחשבון שלכם. רק מנהלי האתר רואים את היומן, הוא משמש להבנת השימוש באתר ולשיפורו, והוא נמחק אחרי שנה. היומן לא נאסף אם הדפדפן שלכם שולח Global Privacy Control.</li>
         </ul>
 
         <h2>פרסומות</h2>
@@ -1226,6 +1355,7 @@
   upgradeHashLink();
   Account.init().finally(() => {
     Analytics.init(Account.config.gaId);
+    Track.init();
     route();
   });
 })();

@@ -375,7 +375,14 @@ test page show "can you beat it?" with the friend's score, and a message if the 
 - **Cross-site request forgery:** requests that change data must be JSON and come from the site's
   own origin.
 - **Admin access:** admin accounts come from a server secret, and the admin dashboard shows
-  usage statistics and recent sign-ups.
+  usage statistics, recent sign-ups and "Who did what".
+- **Activity log ("Who did what"):** `Track` in `account.js` gives each browser a random id (the
+  `vid` cookie) and sends page views, session starts, finishes and abandons, sign-ins, shares and
+  language switches to `/api/track` in batches. The worker stores them in the `visitors` and
+  `events` tables with city, country, device and browser, linking a browser to its account once it
+  signs in. Bots, admins and browsers sending Global Privacy Control are not logged, and the daily
+  cron deletes activity older than a year. The admin page shows everyone active on a chosen day
+  with their actions in order, and any person's full history.
 - **Analytics:** Google Analytics sends its own page views for the History API navigation. It is
   not loaded for admins or for visitors whose browser sends Global Privacy Control.
 - **Ads:** AdSense is configured with environment variables and stays off until it is set up.

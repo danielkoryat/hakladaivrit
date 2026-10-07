@@ -110,6 +110,7 @@ const Account = {
     d.totals.count++;
     d.totals.secs += entry.secs;
     Analytics.finish(r.kind, r.wpm, r.acc);
+    Track.event('finish', { kind: r.kind, label: entry.label, wpm: Math.round(r.wpm), acc: Math.round(r.acc), secs: Math.round(r.secs), chars: r.chars, errors: r.errors, stars: entry.stars });
     const reward = Gamify.award(d, r);
 
     if (this.user) {
@@ -128,6 +129,7 @@ const Account = {
     const prevBest = Gamify.state(d).best[mode] || 0;
     const reward = Gamify.award(d, { kind: 'game', mode, score, secs: 0, wpm: 0 });
     Analytics.event('game_over', { mode, score });
+    Track.event('finish', { kind: 'game', mode, score, level });
     if (this.user) {
       Api.req('POST', '/game', { mode, score, level }).catch(() => {});
       this.saveGame();
@@ -154,6 +156,8 @@ const Account = {
   async googleAuth(credential) {
     const r = await Api.req('POST', '/auth/google', { credential });
     Analytics.event(r.created ? 'sign_up' : 'login', { method: 'google' });
+    Track.event(r.created ? 'sign_up' : 'login');
+    Track.flush();
     await this.signedIn(r.user);
   },
 
@@ -176,6 +180,8 @@ const Account = {
   },
 
   async logout() {
+    Track.event('logout');
+    Track.flush();
     await Api.req('POST', '/logout', {});
     if (window.google && google.accounts) google.accounts.id.disableAutoSelect();
     this.user = null;
@@ -258,6 +264,68 @@ const Analytics = {
   },
   finish(kind, wpm, acc) {
     this.event('training_complete', { activity: kind, wpm: Math.round(wpm), accuracy: Math.round(acc) });
+  },
+};
+
+// ---------- Activity log (the admin page's "who did what") ----------
+// Every browser gets a random id (the "vid" cookie). Page views and what the visitor does there
+// (starting, finishing or leaving a session, signing in, sharing) go to /api/track in small
+// batches. Not sent for admins or when Global Privacy Control is on.
+const Track = {
+  queue: [],
+  run: null,
+  ref: document.referrer && !document.referrer.startsWith(location.origin) ? document.referrer : '',
+  get on() { return !navigator.globalPrivacyControl && !(Account.user && Account.user.isAdmin); },
+  init() {
+    window.addEventListener('pagehide', () => { this.abandon(null, 'closed'); this.flush(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.flush(); });
+  },
+  vid() {
+    if (/(?:^|;\s*)vid=[a-z0-9]{16,32}(?:;|$)/.test(document.cookie)) return;
+    const id = [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(36).padStart(2, '0')).join('');
+    document.cookie = `vid=${id}; Path=/; Max-Age=34560000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
+  },
+  event(type, data = null, path = location.pathname) {
+    if (!this.on) return;
+    this.vid();
+    this.queue.push({ at: Date.now(), type, path, data });
+    clearTimeout(this.timer);
+    if (this.queue.length >= 20) this.flush();
+    else this.timer = setTimeout(() => this.flush(), 3000);
+  },
+  flush() {
+    clearTimeout(this.timer);
+    if (!this.queue.length) return;
+    const events = this.queue.splice(0, 50);
+    fetch('/api/track', {
+      method: 'POST', keepalive: true, credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ now: Date.now(), ref: this.ref, events }),
+    }).catch(() => {});
+  },
+  view() { this.event('view', { title: document.title }); },
+
+  // Which kind of session runs on a page, for Google Analytics (the same names as training_complete).
+  activity(path) {
+    const p = path.replace(/^\/en(?=\/|$)/, '');
+    return /^\/lesson\//.test(p) ? 'lesson' : /^\/custom\//.test(p) ? 'custom' : /^\/texts\//.test(p) ? 'text' : p.slice(1) || 'home';
+  },
+
+  // A typing session or game round in progress. `owner` is the Typer or game round running it;
+  // `progress()` says how far it got, for the "abandon" event.
+  begin(owner, progress, data = null) {
+    if (this.run && this.run.owner !== owner) this.abandon(this.run.owner, 'restart');
+    this.run = { owner, progress, t0: Date.now(), path: location.pathname };
+    this.event('start', data);
+    Analytics.event('training_start', { activity: this.activity(this.run.path) });
+  },
+  end(owner) { if (this.run && this.run.owner === owner) this.run = null; },
+  abandon(owner, why) {
+    const r = this.run;
+    if (!r || (owner && r.owner !== owner)) return;
+    this.run = null;
+    const secs = Math.round((Date.now() - r.t0) / 1000);
+    this.event('abandon', { why, secs, ...r.progress() }, r.path);
+    Analytics.event('training_abandon', { activity: this.activity(r.path), seconds: secs, reason: why });
   },
 };
 

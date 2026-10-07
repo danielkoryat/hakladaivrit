@@ -118,6 +118,7 @@ const Share = {
       if (!b) { if (e.target === dlg) dlg.close(); return; }
       const act = b.dataset.act;
       Analytics.event('share', { method: act });
+      Track.event('share', { method: act });
       if (act === 'close') dlg.close();
       if (act === 'native') {
         try { await navigator.share(file ? { files: [file], text, title: tr('הקלדה עיוורת', 'Hakladaivrit') } : { text, url: opts.url }); } catch { /* cancelled */ }

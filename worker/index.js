@@ -283,6 +283,115 @@ async function adminStats(env, days, cfg) {
   };
 }
 
+// ---------- Activity log (admin page: who did what, day by day) ----------
+// Each browser has a random id in the "vid" cookie (set by Track in account.js). Bots and
+// admins are not logged.
+const EVENT_TYPES = new Set(['view', 'start', 'finish', 'abandon', 'sign_up', 'login', 'logout', 'share', 'site']);
+const VID = /^[a-z0-9]{16,32}$/;
+const clip = (s, n) => (s == null || s === '' ? null : String(s).slice(0, n));
+
+function visitorInfo(request) {
+  const ua = request.headers.get('User-Agent') || '';
+  const cf = request.cf || {};
+  return {
+    device: /iPad|Tablet|Android(?!.*Mobile)/i.test(ua) ? 'tablet' : /Mobi|iPhone|Android/i.test(ua) ? 'mobile' : 'desktop',
+    browser: /Edg\//.test(ua) ? 'Edge' : /OPR\/|Opera/.test(ua) ? 'Opera' : /SamsungBrowser/.test(ua) ? 'Samsung Internet'
+      : /Firefox|FxiOS/.test(ua) ? 'Firefox' : /Chrome|CriOS/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : 'Other',
+    os: /Windows/.test(ua) ? 'Windows' : /Android/.test(ua) ? 'Android' : /iPhone|iPad|iPod/.test(ua) ? 'iOS'
+      : /Mac OS X|Macintosh/.test(ua) ? 'macOS' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : 'Other',
+    country: cf.country || null,
+    city: clip(cf.city, 80),
+    lang: clip((request.headers.get('Accept-Language') || '').split(/[,;]/)[0].trim(), 20),
+  };
+}
+
+// events: [{ at, type, path, data (JSON string or null) }]
+async function logEvents(request, env, cfg, events, referrer) {
+  const vid = cookies(request).vid || '';
+  const ua = request.headers.get('User-Agent') || '';
+  if (!events.length || !VID.test(vid) || !ua || CRAWLER_UA.test(ua)) return;
+  const user = await currentUser(request, env);
+  if (user && cfg.admins.has(String(user.email).toLowerCase())) return;
+  const v = visitorInfo(request);
+  const uid = user ? user.id : null;
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO visitors (id, user_id, first_seen, last_seen, referrer, country, city, device, browser, os, lang)
+                    VALUES (?1, ?2, ?3, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                    ON CONFLICT(id) DO UPDATE SET user_id = COALESCE(excluded.user_id, visitors.user_id), last_seen = excluded.last_seen,
+                      country = excluded.country, city = excluded.city, device = excluded.device, browser = excluded.browser,
+                      os = excluded.os, lang = excluded.lang`)
+      .bind(vid, uid, now, clip(referrer, 300), v.country, v.city, v.device, v.browser, v.os, v.lang),
+    env.DB.prepare(`INSERT INTO events (visitor_id, user_id, at, type, path, data)
+                    SELECT ?1, ?2, json_extract(value, '$.at'), json_extract(value, '$.type'), json_extract(value, '$.path'), json_extract(value, '$.data')
+                    FROM json_each(?3)`).bind(vid, uid, JSON.stringify(events)),
+  ]);
+}
+
+// Calendar days in the report time zone.
+const dayOf = (ts, tz) => new Date(ts).toLocaleDateString('en-CA', { timeZone: tz });
+const tzFormats = {};
+function tzOffset(ts, tz) { // how far the zone's clock is ahead of UTC at ts, in ms
+  const f = tzFormats[tz] || (tzFormats[tz] = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',
+  }));
+  const p = Object.fromEntries(f.formatToParts(ts).map(x => [x.type, Number(x.value)]));
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(ts / 1000) * 1000;
+}
+const dayStartAt = (day, tz) => { const utc = Date.parse(`${day}T00:00:00Z`); return utc - tzOffset(utc - tzOffset(utc, tz), tz); };
+const nextDay = day => new Date(Date.parse(`${day}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+
+// Groups event rows into people: an account (all its browsers) or an anonymous browser.
+async function people(env, rows) {
+  const uids = [...new Set(rows.map(r => r.uid).filter(Boolean))];
+  const vids = [...new Set(rows.map(r => r.vid))];
+  const [users, visitors] = await env.DB.batch([
+    env.DB.prepare('SELECT id, email, name, created_at AS createdAt FROM users WHERE id IN (SELECT value FROM json_each(?1))').bind(JSON.stringify(uids)),
+    env.DB.prepare(`SELECT id, first_seen AS firstSeen, referrer, country, city, device, browser, os, lang
+                    FROM visitors WHERE id IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(vids)),
+  ]);
+  const userById = new Map(users.results.map(u => [u.id, u]));
+  const visitorById = new Map(visitors.results.map(v => [v.id, v]));
+  const byKey = new Map();
+  for (const r of rows) {
+    const key = r.uid ? `u${r.uid}` : `v${r.vid}`;
+    let p = byKey.get(key);
+    if (!p) {
+      const u = r.uid ? userById.get(r.uid) : null;
+      p = { key, name: u ? u.name : '', email: u ? u.email : '', joined: u ? u.createdAt : null, visitors: [], events: [] };
+      byKey.set(key, p);
+    }
+    if (!p.visitors.some(v => v.id === r.vid) && visitorById.has(r.vid)) p.visitors.push(visitorById.get(r.vid));
+    let data = null;
+    try { data = r.data ? JSON.parse(r.data) : null; } catch { /* kept as null */ }
+    p.events.push({ at: r.at, type: r.type, path: r.path, data, vid: r.vid });
+  }
+  return [...byKey.values()];
+}
+
+const EVENT_ROWS = `SELECT e.visitor_id AS vid, COALESCE(e.user_id, v.user_id) AS uid, e.at, e.type, e.path, e.data
+                    FROM events e LEFT JOIN visitors v ON v.id = e.visitor_id`;
+
+// Everyone who did something on one day, with their actions in order.
+async function activityDay(env, cfg, day) {
+  const { results } = await env.DB.prepare(`${EVENT_ROWS} WHERE e.at >= ?1 AND e.at < ?2 ORDER BY e.at, e.id LIMIT 20000`)
+    .bind(dayStartAt(day, cfg.tz), dayStartAt(nextDay(day), cfg.tz)).all();
+  const list = await people(env, results);
+  list.sort((a, b) => b.events[b.events.length - 1].at - a.events[a.events.length - 1].at);
+  return { day, today: dayOf(Date.now(), cfg.tz), tz: cfg.tz, people: list };
+}
+
+// Everything one person did (newest 5000 actions), for the person's full history.
+async function activityPerson(env, cfg, key) {
+  const uid = /^u(\d+)$/.exec(key), vid = /^v([a-z0-9]{16,32})$/.exec(key);
+  if (!uid && !vid) return null;
+  const { results } = uid
+    ? await env.DB.prepare(`${EVENT_ROWS} WHERE e.user_id = ?1 OR e.visitor_id IN (SELECT id FROM visitors WHERE user_id = ?1) ORDER BY e.at DESC, e.id DESC LIMIT 5000`).bind(Number(uid[1])).all()
+    : await env.DB.prepare(`${EVENT_ROWS} WHERE e.visitor_id = ?1 ORDER BY e.at DESC, e.id DESC LIMIT 5000`).bind(vid[1]).all();
+  results.reverse();
+  return { tz: cfg.tz, person: (await people(env, results)).find(p => p.key === key) || null };
+}
+
 // ---------- API ----------
 async function api(request, env, route, cfg) {
   const method = request.method;
@@ -352,6 +461,22 @@ async function api(request, env, route, cfg) {
     const board = ['week', 'all', 'game', 'xp'].includes(url.searchParams.get('board')) ? url.searchParams.get('board') : 'week';
     const lang = url.searchParams.get('lang') === 'en' ? 'en' : 'he';
     return json(200, await leaderboard(env, board, await currentUser(request, env), lang));
+  }
+
+  // Activity log batches from Track (account.js). Times are moved onto the server's clock.
+  if (route === '/track' && method === 'POST') {
+    const body = await readJson(request);
+    const now = Date.now();
+    const sent = Number(body.now) || now;
+    const events = (Array.isArray(body.events) ? body.events : []).slice(0, 50)
+      .filter(e => e && EVENT_TYPES.has(e.type))
+      .map(e => {
+        const data = e.data && typeof e.data === 'object' ? JSON.stringify(e.data) : null;
+        const at = now - (sent - (Number(e.at) || sent));
+        return { at: Math.min(now, Math.max(now - 86400000, at)), type: e.type, path: clip(e.path, 200), data: data && data.length <= 2000 ? data : null };
+      });
+    await logEvents(request, env, cfg, events, body.ref);
+    return json(204, null);
   }
 
   const user = await currentUser(request, env);
@@ -452,6 +577,18 @@ async function api(request, env, route, cfg) {
     if (!cfg.admins.has(String(user.email).toLowerCase())) return json(403, { error: 'אין הרשאה' });
     const days = [7, 30, 90, 365].includes(Number(url.searchParams.get('days'))) ? Number(url.searchParams.get('days')) : 30;
     return json(200, await adminStats(env, days, cfg));
+  }
+
+  if (route === '/admin/activity' && method === 'GET') {
+    if (!cfg.admins.has(String(user.email).toLowerCase())) return json(403, { error: 'אין הרשאה' });
+    const day = url.searchParams.get('day') || '';
+    return json(200, await activityDay(env, cfg, /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(Date.parse(day)) ? day : dayOf(Date.now(), cfg.tz)));
+  }
+
+  if (route === '/admin/person' && method === 'GET') {
+    if (!cfg.admins.has(String(user.email).toLowerCase())) return json(403, { error: 'אין הרשאה' });
+    const r = await activityPerson(env, cfg, url.searchParams.get('key') || '');
+    return r && r.person ? json(200, r) : json(404, { error: 'לא נמצא' });
   }
 
   return json(404, { error: 'לא נמצא' });
@@ -956,7 +1093,7 @@ async function servePage(request, env, cfg, meta) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     // One address per page: https, without www. Cloudflare's CF-Visitor header carries the
     // scheme the visitor used; it is missing in local development, which stays on http.
@@ -991,6 +1128,8 @@ export default {
       const choice = url.searchParams.get('site');
       if (choice === 'he' || choice === 'en') {
         url.searchParams.delete('site');
+        ctx.waitUntil(logEvents(request, env, cfg, [{ at: Date.now(), type: 'site', path: url.pathname, data: JSON.stringify({ to: choice }) }])
+          .catch(e => console.error(e)));
         return redirect(url.pathname + url.search, {
           'Set-Cookie': `site=${choice}; Path=/; Max-Age=31536000; SameSite=Lax${url.protocol === 'https:' ? '; Secure' : ''}`,
         });
@@ -1006,8 +1145,13 @@ export default {
     }
   },
 
-  // Daily clean-up of expired sessions (cron trigger in wrangler.jsonc).
+  // Daily clean-up (cron trigger in wrangler.jsonc): expired sessions, and activity older than a year.
   async scheduled(_event, env) {
-    await env.DB.prepare('DELETE FROM sessions WHERE expires_at <= ?1').bind(Date.now()).run();
+    const yearAgo = Date.now() - 365 * 86400000;
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM sessions WHERE expires_at <= ?1').bind(Date.now()),
+      env.DB.prepare('DELETE FROM events WHERE at < ?1').bind(yearAgo),
+      env.DB.prepare('DELETE FROM visitors WHERE last_seen < ?1').bind(yearAgo),
+    ]);
   },
 };
