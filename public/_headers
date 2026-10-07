@@ -2,3 +2,7 @@
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
+
+# Page-text fragments the app loads into pages; never pages of their own in search results.
+/content/*
+  X-Robots-Tag: noindex
